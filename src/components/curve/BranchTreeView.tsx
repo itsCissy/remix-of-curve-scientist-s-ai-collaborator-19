@@ -42,11 +42,10 @@ const BranchTreeView = ({
 }: BranchTreeViewProps) => {
   // Canvas pan and zoom state
   const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState({ x: 50, y: 50 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
 
   // Extract summary and questions from messages
   const extractBranchData = useCallback((branchId: string): { summary: string; questions: string[] } => {
@@ -139,7 +138,7 @@ const BranchTreeView = ({
   const zoomOut = () => setScale((prev) => Math.max(prev - 0.2, 0.25));
   const resetView = () => {
     setScale(1);
-    setPosition({ x: 0, y: 0 });
+    setPosition({ x: 50, y: 50 });
   };
 
   const getCollaboratorName = (collaboratorId: string | null): string => {
@@ -157,34 +156,161 @@ const BranchTreeView = ({
   // Card dimensions for layout
   const CARD_WIDTH = 360;
   const CARD_GAP_X = 120;
-  const CARD_GAP_Y = 60;
+  const CARD_GAP_Y = 40;
 
-  // Render curved connection line using SVG
-  const renderConnection = (
-    fromX: number, 
-    fromY: number, 
-    toX: number, 
-    toY: number, 
-    key: string
-  ) => {
-    // Control points for bezier curve
-    const midX = (fromX + toX) / 2;
-    
-    const path = `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`;
-    
+  // Render single branch card
+  const renderCard = (node: BranchNode, x: number, y: number) => {
+    const isSelected = node.id === currentBranchId;
+    const canMerge = !node.is_main && onMergeBranch;
+
     return (
-      <path
-        key={key}
-        d={path}
-        fill="none"
-        stroke="hsl(var(--border))"
-        strokeWidth="2"
-        className="transition-all duration-300"
-      />
+      <div
+        key={node.id}
+        className={cn(
+          "absolute group cursor-pointer transition-all duration-200",
+          "bg-card border rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-1",
+          isSelected && "ring-2 ring-primary"
+        )}
+        style={{
+          left: x,
+          top: y,
+          width: CARD_WIDTH,
+        }}
+        onClick={() => onSelectBranch(node.id)}
+      >
+        {/* Card Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-base text-foreground">{node.name}</span>
+            {node.is_main && (
+              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded">
+                主线
+              </span>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-1">
+            {/* Merge button */}
+            {canMerge && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMergeBranch(node.id, node.summary);
+                    }}
+                    className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-primary/10 transition-all"
+                  >
+                    <GitMerge className="w-4 h-4 text-primary" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>合并到主线</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            
+            {/* Delete button */}
+            {!node.is_main && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteBranch(node.id);
+                    }}
+                    className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>删除分支</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] text-white font-medium ml-1"
+                  style={{ backgroundColor: getCollaboratorColor(node.created_by) }}
+                >
+                  {getCollaboratorName(node.created_by).charAt(0)}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>创建者: {getCollaboratorName(node.created_by)}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+        
+        {/* Summary Content */}
+        <div className="px-4 py-3 border-b border-border/30 min-h-[80px]">
+          {node.summary ? (
+            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
+              {node.summary}
+            </p>
+          ) : node.description ? (
+            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
+              {node.description}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground/50 italic">
+              暂无会话内容
+            </p>
+          )}
+        </div>
+        
+        {/* Questions List */}
+        {node.questions && node.questions.length > 0 && (
+          <div className="px-4 py-3 space-y-2 border-b border-border/30">
+            {node.questions.map((question, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                  <span className="text-[10px] text-muted-foreground font-medium">Q</span>
+                </div>
+                <span className="text-xs text-muted-foreground truncate">
+                  问题{idx + 1}：{question}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Footer */}
+        <div className="flex items-center justify-between px-4 py-2 bg-muted/30 rounded-b-xl">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>{node.messageCount || 0} 条消息</span>
+          </div>
+          {node.children.length > 0 && (
+            <span className="text-[10px] text-muted-foreground bg-accent/80 px-1.5 py-0.5 rounded-md">
+              {node.children.length} 子分支
+            </span>
+          )}
+        </div>
+
+        {/* Selected indicator */}
+        {isSelected && (
+          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-primary rounded-r-full shadow-lg" />
+        )}
+      </div>
     );
   };
 
-  // Calculate positions and render nodes
+  // Calculate card heights
+  const calculateCardHeight = (node: BranchNode): number => {
+    let height = 120; // header + footer
+    height += 80; // summary area
+    if (node.questions && node.questions.length > 0) {
+      height += node.questions.length * 28 + 24; // questions
+    }
+    return height;
+  };
+
+  // Render tree with positions
   const renderBranchTree = () => {
     if (buildTree.length === 0) {
       return (
@@ -198,243 +324,98 @@ const BranchTreeView = ({
       );
     }
 
-    // Calculate positions for each node
-    const positions = new Map<string, { x: number; y: number; height: number }>();
-    const connections: { fromId: string; toId: string }[] = [];
+    // Layout calculation
+    const positions: { node: BranchNode; x: number; y: number; height: number }[] = [];
+    const connections: { fromX: number; fromY: number; toX: number; toY: number }[] = [];
     
-    let currentY = 0;
-    
-    const calculateNodeHeight = (node: BranchNode): number => {
-      // Base height for card header and summary
-      let height = 180;
-      // Add height for questions
-      if (node.questions && node.questions.length > 0) {
-        height += node.questions.length * 40 + 20;
-      }
-      return height;
-    };
-
     const layoutNode = (node: BranchNode, depth: number, startY: number): number => {
-      const height = calculateNodeHeight(node);
+      const height = calculateCardHeight(node);
       const x = depth * (CARD_WIDTH + CARD_GAP_X);
       
       if (node.children.length === 0) {
-        positions.set(node.id, { x, y: startY, height });
+        positions.push({ node, x, y: startY, height });
         return startY + height + CARD_GAP_Y;
       }
       
-      // Layout children first to calculate total height
+      // Layout children first
       let childY = startY;
+      const childPositions: { y: number; height: number }[] = [];
+      
       node.children.forEach(child => {
-        connections.push({ fromId: node.id, toId: child.id });
+        const childStart = childY;
         childY = layoutNode(child, depth + 1, childY);
+        const childPos = positions.find(p => p.node.id === child.id);
+        if (childPos) {
+          childPositions.push({ y: childPos.y, height: childPos.height });
+        }
       });
       
-      // Center parent node vertically among children
-      const firstChild = positions.get(node.children[0].id);
-      const lastChild = positions.get(node.children[node.children.length - 1].id);
-      
-      if (firstChild && lastChild) {
-        const centerY = (firstChild.y + lastChild.y + lastChild.height) / 2 - height / 2;
-        positions.set(node.id, { x, y: Math.max(startY, centerY), height });
-      } else {
-        positions.set(node.id, { x, y: startY, height });
+      // Center parent among children
+      let parentY = startY;
+      if (childPositions.length > 0) {
+        const firstChildY = childPositions[0].y;
+        const lastChildY = childPositions[childPositions.length - 1].y;
+        const lastChildHeight = childPositions[childPositions.length - 1].height;
+        parentY = (firstChildY + lastChildY + lastChildHeight) / 2 - height / 2;
+        parentY = Math.max(startY, parentY);
       }
+      
+      positions.push({ node, x, y: parentY, height });
+      
+      // Add connections to children
+      node.children.forEach(child => {
+        const childPos = positions.find(p => p.node.id === child.id);
+        if (childPos) {
+          connections.push({
+            fromX: x + CARD_WIDTH,
+            fromY: parentY + height / 2,
+            toX: childPos.x,
+            toY: childPos.y + childPos.height / 2,
+          });
+        }
+      });
       
       return childY;
     };
 
     // Layout all root nodes
+    let currentY = 0;
     buildTree.forEach(root => {
       currentY = layoutNode(root, 0, currentY);
     });
 
-    // Generate SVG connections
-    const svgConnections: JSX.Element[] = [];
-    connections.forEach(({ fromId, toId }) => {
-      const fromPos = positions.get(fromId);
-      const toPos = positions.get(toId);
-      
-      if (fromPos && toPos) {
-        const fromX = fromPos.x + CARD_WIDTH;
-        const fromY = fromPos.y + fromPos.height / 2;
-        const toX = toPos.x;
-        const toY = toPos.y + toPos.height / 2;
-        
-        svgConnections.push(renderConnection(fromX, fromY, toX, toY, `${fromId}-${toId}`));
-      }
-    });
-
-    // Calculate SVG dimensions
+    // Calculate canvas size
     let maxX = 0;
     let maxY = 0;
-    positions.forEach(pos => {
-      maxX = Math.max(maxX, pos.x + CARD_WIDTH + 100);
-      maxY = Math.max(maxY, pos.y + pos.height + 100);
+    positions.forEach(p => {
+      maxX = Math.max(maxX, p.x + CARD_WIDTH + 100);
+      maxY = Math.max(maxY, p.y + p.height + 100);
     });
 
-    // Render cards
-    const renderCard = (node: BranchNode) => {
-      const pos = positions.get(node.id);
-      if (!pos) return null;
-      
-      const isSelected = node.id === currentBranchId;
-      const canMerge = !node.is_main && onMergeBranch;
-
-      return (
-        <div
-          key={node.id}
-          className={cn(
-            "absolute group cursor-pointer transition-all duration-200",
-            "bg-card border rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-1"
-          )}
-          style={{
-            left: pos.x,
-            top: pos.y,
-            width: CARD_WIDTH,
-          }}
-          onClick={() => onSelectBranch(node.id)}
-        >
-          {/* Card Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-base text-foreground">{node.name}</span>
-              {node.is_main && (
-                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded">
-                  主线
-                </span>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-1">
-              {/* Merge button */}
-              {canMerge && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMergeBranch(node.id, node.summary);
-                      }}
-                      className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-primary/10 transition-all"
-                    >
-                      <GitMerge className="w-4 h-4 text-primary" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p>合并到主线</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              
-              {/* Delete button */}
-              {!node.is_main && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteBranch(node.id);
-                      }}
-                      className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all"
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p>删除分支</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] text-white font-medium ml-1"
-                    style={{ backgroundColor: getCollaboratorColor(node.created_by) }}
-                  >
-                    {getCollaboratorName(node.created_by).charAt(0)}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>创建者: {getCollaboratorName(node.created_by)}</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-          
-          {/* Summary Content */}
-          <div className="px-4 py-3 border-b border-border/30">
-            {node.summary ? (
-              <p className="text-sm text-muted-foreground leading-relaxed line-clamp-6">
-                {node.summary}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground/50 italic">
-                暂无会话内容
-              </p>
-            )}
-          </div>
-          
-          {/* Questions List */}
-          {node.questions && node.questions.length > 0 && (
-            <div className="px-4 py-3 space-y-2">
-              {node.questions.map((question, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                    <span className="text-[10px] text-muted-foreground font-medium">Q</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground truncate">
-                    问题{idx + 1}：{question}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {/* Footer */}
-          <div className="flex items-center justify-between px-4 py-2 bg-muted/30 rounded-b-xl">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>{node.messageCount} 条消息</span>
-            </div>
-            {node.children.length > 0 && (
-              <span className="text-[10px] text-muted-foreground bg-accent/80 px-1.5 py-0.5 rounded-md">
-                {node.children.length} 子分支
-              </span>
-            )}
-          </div>
-
-          {/* Selected indicator */}
-          {isSelected && (
-            <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-primary rounded-r-full shadow-lg" />
-          )}
-        </div>
-      );
-    };
-
-    // Collect all nodes for rendering
-    const allNodes: BranchNode[] = [];
-    const collectNodes = (nodes: BranchNode[]) => {
-      nodes.forEach(node => {
-        allNodes.push(node);
-        collectNodes(node.children);
-      });
-    };
-    collectNodes(buildTree);
-
     return (
-      <div className="relative" style={{ width: maxX, height: maxY }}>
-        {/* SVG layer for connections */}
+      <div className="relative" style={{ width: maxX, height: maxY, minWidth: 500, minHeight: 300 }}>
+        {/* SVG connections */}
         <svg 
           className="absolute inset-0 pointer-events-none" 
           style={{ width: maxX, height: maxY }}
         >
-          {svgConnections}
+          {connections.map((conn, idx) => {
+            const midX = (conn.fromX + conn.toX) / 2;
+            const path = `M ${conn.fromX} ${conn.fromY} C ${midX} ${conn.fromY}, ${midX} ${conn.toY}, ${conn.toX} ${conn.toY}`;
+            return (
+              <path
+                key={idx}
+                d={path}
+                fill="none"
+                stroke="hsl(var(--border))"
+                strokeWidth="2"
+              />
+            );
+          })}
         </svg>
         
-        {/* Cards layer */}
-        {allNodes.map(renderCard)}
+        {/* Cards */}
+        {positions.map(({ node, x, y }) => renderCard(node, x, y))}
       </div>
     );
   };
@@ -527,14 +508,13 @@ const BranchTreeView = ({
 
         {/* Draggable content */}
         <div
-          ref={contentRef}
           className="absolute"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             transformOrigin: '0 0',
           }}
         >
-          <div className="p-8">
+          <div className="p-4">
             {renderBranchTree()}
           </div>
         </div>
