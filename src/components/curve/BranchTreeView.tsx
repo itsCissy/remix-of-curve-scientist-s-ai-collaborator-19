@@ -162,14 +162,19 @@ const BranchTreeView = ({
   const renderCard = (node: BranchNode, x: number, y: number) => {
     const isSelected = node.id === currentBranchId;
     const canMerge = !node.is_main && onMergeBranch;
+    const isMainBranch = node.is_main;
 
     return (
       <div
         key={node.id}
         className={cn(
-          "absolute group cursor-pointer transition-all duration-200",
-          "bg-card border rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-1",
-          isSelected && "ring-2 ring-primary"
+          "absolute group cursor-pointer transition-all duration-300 ease-out",
+          "rounded-2xl overflow-hidden",
+          "hover:-translate-y-1.5 hover:shadow-2xl",
+          isMainBranch 
+            ? "bg-gradient-to-br from-primary/5 via-card to-card border-2 border-primary/30 shadow-lg shadow-primary/10" 
+            : "bg-card border border-border/60 shadow-md",
+          isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
         )}
         style={{
           left: x,
@@ -178,18 +183,45 @@ const BranchTreeView = ({
         }}
         onClick={() => onSelectBranch(node.id)}
       >
+        {/* Main branch glow effect */}
+        {isMainBranch && (
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent pointer-events-none" />
+        )}
+        
         {/* Card Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-base text-foreground">{node.name}</span>
-            {node.is_main && (
-              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded">
-                主线
+        <div className={cn(
+          "relative flex items-center justify-between px-4 py-3.5",
+          isMainBranch 
+            ? "bg-gradient-to-r from-primary/10 to-transparent border-b border-primary/20" 
+            : "border-b border-border/50"
+        )}>
+          <div className="flex items-center gap-3">
+            {/* Branch icon */}
+            <div className={cn(
+              "w-9 h-9 rounded-xl flex items-center justify-center shadow-sm",
+              isMainBranch 
+                ? "bg-primary text-primary-foreground" 
+                : "bg-muted text-muted-foreground"
+            )}>
+              <GitBranch className="w-4.5 h-4.5" />
+            </div>
+            
+            <div className="flex flex-col">
+              <span className={cn(
+                "font-bold text-base",
+                isMainBranch ? "text-primary" : "text-foreground"
+              )}>
+                {node.name}
               </span>
-            )}
+              {isMainBranch && (
+                <span className="text-[10px] text-primary/70 font-medium">
+                  核心对话线程
+                </span>
+              )}
+            </div>
           </div>
           
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             {/* Merge button */}
             {canMerge && (
               <Tooltip>
@@ -199,7 +231,7 @@ const BranchTreeView = ({
                       e.stopPropagation();
                       onMergeBranch(node.id, node.summary);
                     }}
-                    className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-primary/10 transition-all"
+                    className="p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-primary/15 transition-all duration-200"
                   >
                     <GitMerge className="w-4 h-4 text-primary" />
                   </button>
@@ -219,7 +251,7 @@ const BranchTreeView = ({
                       e.stopPropagation();
                       onDeleteBranch(node.id);
                     }}
-                    className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all"
+                    className="p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-destructive/15 transition-all duration-200"
                   >
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </button>
@@ -233,7 +265,7 @@ const BranchTreeView = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] text-white font-medium ml-1"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] text-white font-semibold ml-1 shadow-sm ring-2 ring-background"
                   style={{ backgroundColor: getCollaboratorColor(node.created_by) }}
                 >
                   {getCollaboratorName(node.created_by).charAt(0)}
@@ -247,32 +279,43 @@ const BranchTreeView = ({
         </div>
         
         {/* Summary Content */}
-        <div className="px-4 py-3 border-b border-border/30 min-h-[80px]">
-          {node.summary ? (
-            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
-              {node.summary}
-            </p>
-          ) : node.description ? (
-            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
-              {node.description}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground/50 italic">
-              暂无会话内容
-            </p>
-          )}
+        <div className="relative px-4 py-4 min-h-[100px]">
+          <div className="absolute top-3 left-4 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+            摘要
+          </div>
+          <div className="mt-4">
+            {node.summary ? (
+              <p className="text-sm text-foreground/80 leading-relaxed line-clamp-4">
+                {node.summary}
+              </p>
+            ) : node.description ? (
+              <p className="text-sm text-foreground/80 leading-relaxed line-clamp-4">
+                {node.description}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground/40 italic">
+                暂无会话内容
+              </p>
+            )}
+          </div>
         </div>
         
         {/* Questions List */}
         {node.questions && node.questions.length > 0 && (
-          <div className="px-4 py-3 space-y-2 border-b border-border/30">
+          <div className="px-4 pb-3 space-y-2">
+            <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2">
+              提问记录
+            </div>
             {node.questions.map((question, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                  <span className="text-[10px] text-muted-foreground font-medium">Q</span>
+              <div 
+                key={idx} 
+                className="flex items-center gap-2.5 p-2 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors"
+              >
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[10px] text-primary font-bold">{idx + 1}</span>
                 </div>
-                <span className="text-xs text-muted-foreground truncate">
-                  问题{idx + 1}：{question}
+                <span className="text-xs text-foreground/70 truncate flex-1">
+                  {question}
                 </span>
               </div>
             ))}
@@ -280,32 +323,47 @@ const BranchTreeView = ({
         )}
         
         {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-2 bg-muted/30 rounded-b-xl">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>{node.messageCount || 0} 条消息</span>
+        <div className={cn(
+          "flex items-center justify-between px-4 py-2.5",
+          isMainBranch 
+            ? "bg-primary/5 border-t border-primary/10" 
+            : "bg-muted/40 border-t border-border/30"
+        )}>
+          <div className="flex items-center gap-2 text-xs">
+            <div className={cn(
+              "flex items-center gap-1.5 px-2 py-1 rounded-md",
+              isMainBranch ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+            )}>
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span className="font-medium">{node.messageCount || 0}</span>
+            </div>
+            <span className="text-muted-foreground/60">条消息</span>
           </div>
           {node.children.length > 0 && (
-            <span className="text-[10px] text-muted-foreground bg-accent/80 px-1.5 py-0.5 rounded-md">
-              {node.children.length} 子分支
-            </span>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-accent/60 px-2 py-1 rounded-md">
+              <GitBranch className="w-3 h-3" />
+              <span>{node.children.length} 子分支</span>
+            </div>
           )}
         </div>
 
         {/* Selected indicator */}
         {isSelected && (
-          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-primary rounded-r-full shadow-lg" />
+          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-16 bg-gradient-to-b from-primary via-primary to-primary/50 rounded-r-full shadow-lg shadow-primary/30" />
         )}
+        
+        {/* Hover border glow */}
+        <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none border-2 border-primary/20" />
       </div>
     );
   };
 
   // Calculate card heights
   const calculateCardHeight = (node: BranchNode): number => {
-    let height = 120; // header + footer
-    height += 80; // summary area
+    let height = 140; // header + footer (increased)
+    height += 100; // summary area (increased)
     if (node.questions && node.questions.length > 0) {
-      height += node.questions.length * 28 + 24; // questions
+      height += node.questions.length * 40 + 32; // questions with padding
     }
     return height;
   };
@@ -399,17 +457,44 @@ const BranchTreeView = ({
           className="absolute inset-0 pointer-events-none" 
           style={{ width: maxX, height: maxY }}
         >
+          <defs>
+            <linearGradient id="connectionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.4" />
+              <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="hsl(var(--border))" stopOpacity="0.6" />
+            </linearGradient>
+          </defs>
           {connections.map((conn, idx) => {
             const midX = (conn.fromX + conn.toX) / 2;
             const path = `M ${conn.fromX} ${conn.fromY} C ${midX} ${conn.fromY}, ${midX} ${conn.toY}, ${conn.toX} ${conn.toY}`;
             return (
-              <path
-                key={idx}
-                d={path}
-                fill="none"
-                stroke="hsl(var(--border))"
-                strokeWidth="2"
-              />
+              <g key={idx}>
+                {/* Shadow line */}
+                <path
+                  d={path}
+                  fill="none"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth="6"
+                  opacity="0.1"
+                  strokeLinecap="round"
+                />
+                {/* Main line */}
+                <path
+                  d={path}
+                  fill="none"
+                  stroke="url(#connectionGradient)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+                {/* Connection dot at end */}
+                <circle
+                  cx={conn.toX}
+                  cy={conn.toY}
+                  r="4"
+                  fill="hsl(var(--primary))"
+                  opacity="0.6"
+                />
+              </g>
             );
           })}
         </svg>
