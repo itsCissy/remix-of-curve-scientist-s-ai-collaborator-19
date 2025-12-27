@@ -8,6 +8,7 @@ interface UserAvatarProps {
   size?: "sm" | "md" | "lg";
   showName?: boolean;
   isCollapsed?: boolean;
+  showMenu?: boolean;
 }
 
 const menuItems = [
@@ -16,7 +17,7 @@ const menuItems = [
   { id: "language", label: "语言切换", icon: Languages },
 ];
 
-const UserAvatar = ({ name, size = "md", showName = true, isCollapsed = false }: UserAvatarProps) => {
+const UserAvatar = ({ name, size = "md", showName = true, isCollapsed = false, showMenu = true }: UserAvatarProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
 
@@ -27,6 +28,7 @@ const UserAvatar = ({ name, size = "md", showName = true, isCollapsed = false }:
   };
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!showMenu) return;
     const rect = e.currentTarget.getBoundingClientRect();
     setMenuPosition({
       top: rect.bottom + 8,
@@ -46,6 +48,21 @@ const UserAvatar = ({ name, size = "md", showName = true, isCollapsed = false }:
     setMenuOpen(false);
     // TODO: Implement logout functionality
   };
+
+  // Simple avatar without menu
+  if (!showMenu) {
+    return (
+      <div
+        className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-rose-200 to-rose-300 flex items-center justify-center overflow-hidden flex-shrink-0`}
+      >
+        <img
+          src="https://api.dicebear.com/7.x/avataaars/svg?seed=chengxixi&backgroundColor=ffd5dc"
+          alt={name || "User"}
+          className="w-full h-full object-cover"
+        />
+      </div>
+    );
+  }
 
   return (
     <>

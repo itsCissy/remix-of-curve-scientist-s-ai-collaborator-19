@@ -61,7 +61,7 @@ const UserMessage = ({ content, attachments }: UserMessageProps) => {
         )}
       </div>
       <div className="flex-shrink-0">
-        <UserAvatar name="" size="md" showName={false} />
+        <UserAvatar name="" size="md" showName={false} showMenu={false} />
       </div>
     </div>
   );
