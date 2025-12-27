@@ -442,6 +442,39 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
     return mainBranch?.name || "主线";
   };
 
+  // Handle creating branch from branch view
+  const handleCreateBranchFromView = async (parentBranchId: string, name: string, inheritContext: boolean) => {
+    // Find a message from parent branch to use as branch point
+    const parentMessages = messagesByBranch[parentBranchId] || [];
+    const lastMessage = parentMessages[parentMessages.length - 1];
+    
+    // Get a message ID from the database for the branch point
+    const { data: messagesData } = await supabase
+      .from("messages")
+      .select("id")
+      .eq("branch_id", parentBranchId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    
+    const branchPointId = messagesData?.[0]?.id || null;
+    
+    const newBranch = await createBranch(
+      branchPointId,
+      name,
+      inheritContext ? "继承上下文" : "独立分支",
+      collaborator?.id
+    );
+    
+    if (newBranch) {
+      // If inheriting context, copy messages from parent
+      if (inheritContext && branchPointId) {
+        // The branch already handles context inheritance through branch_point_message_id
+      }
+      switchBranch(newBranch.id);
+      setShowBranchTree(false);
+    }
+  };
+
   // Show branch tree view
   if (showBranchTree) {
     return (
@@ -459,6 +492,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
           onBack={() => setShowBranchTree(false)}
           messageCountByBranch={messageCountByBranch}
           messagesByBranch={messagesByBranch}
+          onCreateBranch={handleCreateBranchFromView}
         />
         <MergeBranchDialog
           open={showMergeDialog}
