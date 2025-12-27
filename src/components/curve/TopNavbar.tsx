@@ -1,7 +1,7 @@
 import { FolderKanban, Bot, Workflow } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import CurveLogo from "./CurveLogo";
-import { cn } from "@/lib/utils";
+import UserAvatar from "./UserAvatar";
 
 const navItems = [
   { id: "project", label: "Project", icon: FolderKanban, path: "/" },
@@ -32,8 +32,10 @@ const TopNavbar = () => {
         ))}
       </nav>
 
-      {/* Right: Placeholder for future actions */}
-      <div className="w-[100px]" />
+      {/* Right: User Avatar */}
+      <div className="flex items-center">
+        <UserAvatar name="程希希" size="sm" showName={false} />
+      </div>
     </header>
   );
 };
