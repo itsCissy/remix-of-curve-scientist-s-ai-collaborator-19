@@ -60,22 +60,42 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
       const messagesData: Record<string, { content: string; role: string }[]> = {};
       
       for (const branch of branches) {
-        // Get count
-        const { count } = await supabase
-          .from("messages")
-          .select("*", { count: "exact", head: true })
-          .eq("branch_id", branch.id);
-        counts[branch.id] = count || 0;
-        
-        // Get first and last few messages for preview
-        const { data: messages } = await supabase
-          .from("messages")
-          .select("content, role")
-          .eq("branch_id", branch.id)
-          .order("created_at", { ascending: true })
-          .limit(10);
-        
-        messagesData[branch.id] = messages || [];
+        if (branch.is_main) {
+          // Main branch includes messages with null branch_id (legacy messages)
+          const { count } = await supabase
+            .from("messages")
+            .select("*", { count: "exact", head: true })
+            .eq("project_id", projectId)
+            .or(`branch_id.eq.${branch.id},branch_id.is.null`);
+          counts[branch.id] = count || 0;
+          
+          // Get messages for main branch
+          const { data: messages } = await supabase
+            .from("messages")
+            .select("content, role")
+            .eq("project_id", projectId)
+            .or(`branch_id.eq.${branch.id},branch_id.is.null`)
+            .order("created_at", { ascending: true })
+            .limit(10);
+          
+          messagesData[branch.id] = messages || [];
+        } else {
+          // Non-main branches only include their specific messages
+          const { count } = await supabase
+            .from("messages")
+            .select("*", { count: "exact", head: true })
+            .eq("branch_id", branch.id);
+          counts[branch.id] = count || 0;
+          
+          const { data: messages } = await supabase
+            .from("messages")
+            .select("content, role")
+            .eq("branch_id", branch.id)
+            .order("created_at", { ascending: true })
+            .limit(10);
+          
+          messagesData[branch.id] = messages || [];
+        }
       }
       
       setMessageCountByBranch(counts);
