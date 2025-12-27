@@ -1,10 +1,18 @@
-import { useState, KeyboardEvent } from "react";
-import { Eye, Send, Loader2 } from "lucide-react";
+import { useState, KeyboardEvent, useRef, useCallback } from "react";
+import { Eye, Send, Loader2, Paperclip, Image, X, FileText, File } from "lucide-react";
 import AgentSelector from "./AgentSelector";
 import { Agent } from "@/lib/agents";
+import { cn } from "@/lib/utils";
+
+export interface UploadedFile {
+  id: string;
+  file: File;
+  preview?: string;
+  type: "image" | "file";
+}
 
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, files?: UploadedFile[]) => void;
   isLoading?: boolean;
   selectedAgent: Agent;
   onSelectAgent: (agent: Agent) => void;
@@ -12,11 +20,16 @@ interface ChatInputProps {
 
 const ChatInput = ({ onSend, isLoading, selectedAgent, onSelectAgent }: ChatInputProps) => {
   const [input, setInput] = useState("");
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = () => {
-    if (input.trim() && !isLoading) {
-      onSend(input);
+    if ((input.trim() || uploadedFiles.length > 0) && !isLoading) {
+      onSend(input, uploadedFiles.length > 0 ? uploadedFiles : undefined);
       setInput("");
+      setUploadedFiles([]);
     }
   };
 
@@ -27,10 +40,151 @@ const ChatInput = ({ onSend, isLoading, selectedAgent, onSelectAgent }: ChatInpu
     }
   };
 
+  const processFiles = useCallback((files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const newFiles: UploadedFile[] = [];
+
+    fileArray.forEach((file) => {
+      const isImage = file.type.startsWith("image/");
+      const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      if (isImage) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setUploadedFiles((prev) => [
+            ...prev,
+            {
+              id,
+              file,
+              preview: e.target?.result as string,
+              type: "image",
+            },
+          ]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        newFiles.push({
+          id,
+          file,
+          type: "file",
+        });
+      }
+    });
+
+    if (newFiles.length > 0) {
+      setUploadedFiles((prev) => [...prev, ...newFiles]);
+    }
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(e.target.files);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveFile = (id: string) => {
+    setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
+    }
+  };
+
+  const getFileIcon = (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (["pdf"].includes(ext || "")) return <FileText className="w-5 h-5 text-red-500" />;
+    if (["doc", "docx"].includes(ext || "")) return <FileText className="w-5 h-5 text-blue-500" />;
+    if (["xls", "xlsx", "csv"].includes(ext || "")) return <FileText className="w-5 h-5 text-emerald-500" />;
+    return <File className="w-5 h-5 text-muted-foreground" />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
   return (
     <div className="px-6 py-4">
       <div className="max-w-[900px] mx-auto">
-        <div className="bg-card rounded-xl shadow-input border border-border overflow-hidden">
+        <div
+          className={cn(
+            "bg-card rounded-xl shadow-input border overflow-hidden transition-all duration-200",
+            isDragging ? "border-primary border-2 bg-primary/5" : "border-border"
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {/* Drag overlay */}
+          {isDragging && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/10 rounded-xl border-2 border-dashed border-primary pointer-events-none">
+              <div className="text-center">
+                <Paperclip className="w-8 h-8 text-primary mx-auto mb-2" />
+                <p className="text-sm font-medium text-primary">拖放文件到这里</p>
+              </div>
+            </div>
+          )}
+
+          {/* Uploaded files preview */}
+          {uploadedFiles.length > 0 && (
+            <div className="px-4 pt-3 flex flex-wrap gap-2">
+              {uploadedFiles.map((uploadedFile) => (
+                <div
+                  key={uploadedFile.id}
+                  className="relative group"
+                >
+                  {uploadedFile.type === "image" ? (
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border bg-muted">
+                      <img
+                        src={uploadedFile.preview}
+                        alt={uploadedFile.file.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => handleRemoveFile(uploadedFile.id)}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative flex items-center gap-2 px-3 py-2 bg-muted rounded-lg border border-border max-w-[200px]">
+                      {getFileIcon(uploadedFile.file)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{uploadedFile.file.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(uploadedFile.file.size)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveFile(uploadedFile.id)}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Input area */}
           <div className="px-4 py-3">
             <textarea
@@ -52,9 +206,44 @@ const ChatInput = ({ onSend, isLoading, selectedAgent, onSelectAgent }: ChatInpu
 
           {/* Bottom toolbar */}
           <div className="flex items-center justify-between px-3 py-2 border-t border-border/50">
-            <button className="p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground">
-              <Eye className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {/* Image upload button */}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <button
+                onClick={() => imageInputRef.current?.click()}
+                className="p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground"
+                title="上传图片"
+              >
+                <Image className="w-5 h-5" />
+              </button>
+
+              {/* File upload button */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground"
+                title="上传文件"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
+
+              <button className="p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground">
+                <Eye className="w-5 h-5" />
+              </button>
+            </div>
 
             <div className="flex items-center gap-2">
               {/* Agent Selector */}
@@ -66,7 +255,7 @@ const ChatInput = ({ onSend, isLoading, selectedAgent, onSelectAgent }: ChatInpu
               {/* Send Button */}
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || isLoading}
+                disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}
                 className="p-2 rounded-lg text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (

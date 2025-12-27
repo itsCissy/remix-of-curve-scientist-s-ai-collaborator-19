@@ -1,5 +1,12 @@
 import { detectFileType, FileAttachment } from "@/components/curve/FileViewer";
 
+export interface MessageAttachment {
+  name: string;
+  type: string;
+  size: number;
+  preview?: string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -7,6 +14,7 @@ export interface Message {
   timestamp: Date;
   isStreaming?: boolean;
   files?: FileAttachment[];
+  attachments?: MessageAttachment[];
 }
 
 export interface ParsedContent {
