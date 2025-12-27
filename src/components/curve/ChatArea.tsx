@@ -4,14 +4,21 @@ import UserMessage from "./UserMessage";
 import AgentMessage from "./AgentMessage";
 import ChatInput, { UploadedFile } from "./ChatInput";
 import AgentSwitchDialog from "./AgentSwitchDialog";
-import { Message, parseMessageContent, generateId } from "@/lib/messageUtils";
+import { Message as LocalMessage, parseMessageContent, generateId } from "@/lib/messageUtils";
 import { Agent, DEFAULT_AGENT } from "@/lib/agents";
 import { useToast } from "@/hooks/use-toast";
+import { useMessages } from "@/hooks/useProjects";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-const ChatArea = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+interface ChatAreaProps {
+  projectId: string | null;
+  projectName: string;
+}
+
+const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
+  const { messages: dbMessages, addMessage, clearMessages, isLoading: messagesLoading } = useMessages(projectId);
+  const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<Agent>(DEFAULT_AGENT);
   const [pendingAgent, setPendingAgent] = useState<Agent | null>(null);
@@ -19,18 +26,30 @@ const ChatArea = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Sync database messages to local state
+  useEffect(() => {
+    const mapped: LocalMessage[] = dbMessages.map((m) => ({
+      id: m.id,
+      role: m.role as "user" | "assistant",
+      content: m.content,
+      timestamp: new Date(m.created_at),
+      attachments: m.files ? m.files.attachments : undefined,
+    }));
+    setLocalMessages(mapped);
+  }, [dbMessages]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [localMessages]);
 
   const handleAgentChange = (agent: Agent) => {
     if (agent.id === selectedAgent.id) return;
     
-    if (messages.length > 0) {
+    if (localMessages.length > 0) {
       setPendingAgent(agent);
       setShowSwitchDialog(true);
     } else {
@@ -42,11 +61,12 @@ const ChatArea = () => {
     }
   };
 
-  const handleSwitchConfirm = (keepHistory: boolean) => {
+  const handleSwitchConfirm = async (keepHistory: boolean) => {
     if (!pendingAgent) return;
     
     if (!keepHistory) {
-      setMessages([]);
+      await clearMessages();
+      setLocalMessages([]);
     }
     
     setSelectedAgent(pendingAgent);
@@ -61,6 +81,14 @@ const ChatArea = () => {
 
   const handleSend = async (input: string, files?: UploadedFile[]) => {
     if ((!input.trim() && (!files || files.length === 0)) || isLoading) return;
+    if (!projectId) {
+      toast({
+        title: "请先选择或创建项目",
+        description: "需要一个项目来保存对话",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Build message content with file references
     let messageContent = input.trim();
@@ -77,7 +105,7 @@ const ChatArea = () => {
       });
     }
 
-    const userMessage: Message = {
+    const userMessage: LocalMessage = {
       id: generateId(),
       role: "user",
       content: messageContent,
@@ -85,16 +113,26 @@ const ChatArea = () => {
       attachments,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // Add to local state immediately for UX
+    setLocalMessages((prev) => [...prev, userMessage]);
+    
+    // Save to database
+    await addMessage({
+      role: "user",
+      content: messageContent,
+      agent_id: selectedAgent.id,
+      files: attachments.length > 0 ? { attachments } : null,
+    });
+
     setIsLoading(true);
 
     let assistantContent = "";
     
     const upsertAssistant = (nextChunk: string) => {
       assistantContent += nextChunk;
-      setMessages((prev) => {
+      setLocalMessages((prev) => {
         const last = prev[prev.length - 1];
-        if (last?.role === "assistant") {
+        if (last?.role === "assistant" && last.isStreaming) {
           return prev.map((m, i) =>
             i === prev.length - 1
               ? { ...m, content: assistantContent, isStreaming: true }
@@ -115,7 +153,7 @@ const ChatArea = () => {
     };
 
     try {
-      const messagesToSend = [...messages, userMessage].map((m) => ({
+      const messagesToSend = [...localMessages, userMessage].map((m) => ({
         role: m.role,
         content: m.content,
       }));
@@ -216,10 +254,19 @@ const ChatArea = () => {
         }
       }
 
-      // Mark streaming as done
-      setMessages((prev) =>
+      // Mark streaming as done and save to database
+      setLocalMessages((prev) =>
         prev.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
       );
+
+      // Save assistant message to database
+      if (assistantContent) {
+        await addMessage({
+          role: "assistant",
+          content: assistantContent,
+          agent_id: selectedAgent.id,
+        });
+      }
     } catch (error) {
       console.error("Chat error:", error);
       toast({
@@ -234,11 +281,11 @@ const ChatArea = () => {
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-background">
-      <ChatHeader projectName={selectedAgent.name} />
+      <ChatHeader projectName={projectName} />
 
       <div className="flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
         <div className="max-w-[900px] mx-auto space-y-6">
-          {messages.length === 0 ? (
+          {localMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[60vh] text-center">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                 <span className="text-2xl">{selectedAgent.icon}</span>
@@ -251,7 +298,7 @@ const ChatArea = () => {
               </p>
             </div>
           ) : (
-            messages.map((message) =>
+            localMessages.map((message) =>
               message.role === "user" ? (
                 <UserMessage 
                   key={message.id} 
@@ -285,7 +332,7 @@ const ChatArea = () => {
         onOpenChange={setShowSwitchDialog}
         fromAgent={selectedAgent}
         toAgent={pendingAgent ?? selectedAgent}
-        messageCount={messages.length}
+        messageCount={localMessages.length}
         onConfirm={handleSwitchConfirm}
       />
     </div>

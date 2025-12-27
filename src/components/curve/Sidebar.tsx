@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Clock, RefreshCw, SquarePen, Smartphone, Search, X } from "lucide-react";
+import { Clock, RefreshCw, SquarePen, Smartphone, Search, X, Loader2 } from "lucide-react";
 import CurveLogo from "./CurveLogo";
 import ProjectItem from "./ProjectItem";
 import UserAvatar from "./UserAvatar";
@@ -8,38 +8,31 @@ import DeleteConfirmDialog from "./DeleteConfirmDialog";
 import RenameDialog from "./RenameDialog";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { Project } from "@/hooks/useProjects";
 
-interface Project {
-  icon: string;
-  name: string;
-  author: string;
-  isActive?: boolean;
+interface SidebarProps {
+  projects: Project[];
+  isLoading: boolean;
+  activeProject: Project | null;
+  onCreateProject: (data: { name: string; icon: string; description: string }) => Promise<Project | null>;
+  onDeleteProject: (id: string) => Promise<boolean>;
+  onRenameProject: (id: string, name: string) => Promise<boolean>;
+  onSelectProject: (id: string) => Promise<boolean>;
 }
 
-const initialProjects: Project[] = [
-  { icon: "📋", name: "test", author: "程希希", isActive: true },
-  { icon: "📋", name: "Tool Test 251226", author: "xinos" },
-  { icon: "📋", name: "HTE&VAST TEST_PY", author: "张佩宇" },
-  { icon: "📋", name: "筛选测试", author: "谈绿" },
-  { icon: "📋", name: "筛选测试", author: "谈绿" },
-  { icon: "📋", name: "VAST TEST 4", author: "严泽伊" },
-  { icon: "🎯", name: "VAST TEST 3", author: "王兆伦" },
-  { icon: "😊", name: "VAST TEST 2", author: "王兆伦" },
-  { icon: "🐷", name: "VAST TEST", author: "王兆伦" },
-  { icon: "📋", name: "test", author: "canyang.liu" },
-  { icon: "📦", name: "HTE tool test", author: "xinos" },
-  { icon: "🚀", name: "数据协议", author: "熊智" },
-  { icon: "💜", name: "测试 LangGhain", author: "黄金丽" },
-  { icon: "✏️", name: "测试", author: "yansen.lei" },
-  { icon: "💜", name: "TEST Cal Agent", author: "黄金丽" },
-];
-
-const Sidebar = () => {
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
+const Sidebar = ({ 
+  projects, 
+  isLoading, 
+  activeProject,
+  onCreateProject, 
+  onDeleteProject, 
+  onRenameProject,
+  onSelectProject 
+}: SidebarProps) => {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<{ name: string; index: number } | null>(null);
+  const [selectedProject, setSelectedProject] = useState<{ id: string; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredProjects = useMemo(() => {
@@ -52,50 +45,32 @@ const Sidebar = () => {
     );
   }, [searchQuery, projects]);
 
-  const handleProjectCreate = (projectData: { name: string; icon: string; description: string }) => {
-    const newProject: Project = {
-      icon: projectData.icon,
-      name: projectData.name,
-      author: "程希希", // Current user
-      isActive: true,
-    };
-    
-    // Set all projects as inactive and add new one at the top
-    setProjects(prev => [
-      newProject,
-      ...prev.map(p => ({ ...p, isActive: false }))
-    ]);
-    
-    toast.success(`项目 "${projectData.name}" 创建成功`);
+  const handleProjectCreate = async (projectData: { name: string; icon: string; description: string }) => {
+    await onCreateProject(projectData);
   };
 
-  const handleRename = (projectName: string, index: number) => {
-    setSelectedProject({ name: projectName, index });
+  const handleRename = (project: Project) => {
+    setSelectedProject({ id: project.id, name: project.name });
     setRenameDialogOpen(true);
   };
 
-  const handleRenameConfirm = (newName: string) => {
+  const handleRenameConfirm = async (newName: string) => {
     if (selectedProject) {
-      setProjects(prev => 
-        prev.map((p, i) => 
-          i === selectedProject.index ? { ...p, name: newName } : p
-        )
-      );
+      await onRenameProject(selectedProject.id, newName);
       toast.success(`项目已重命名为: ${newName}`);
     }
     setRenameDialogOpen(false);
     setSelectedProject(null);
   };
 
-  const handleDelete = (projectName: string, index: number) => {
-    setSelectedProject({ name: projectName, index });
+  const handleDelete = (project: Project) => {
+    setSelectedProject({ id: project.id, name: project.name });
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (selectedProject) {
-      setProjects(prev => prev.filter((_, i) => i !== selectedProject.index));
-      toast.success(`项目 "${selectedProject.name}" 已删除`);
+      await onDeleteProject(selectedProject.id);
     }
     setDeleteDialogOpen(false);
     setSelectedProject(null);
@@ -117,11 +92,8 @@ const Sidebar = () => {
     toast.success(`已添加到收藏: ${projectName}`);
   };
 
-  const handleOpen = (projectName: string, index: number) => {
-    setProjects(prev => 
-      prev.map((p, i) => ({ ...p, isActive: i === index }))
-    );
-    toast.info(`打开项目: ${projectName}`);
+  const handleOpen = async (project: Project) => {
+    await onSelectProject(project.id);
   };
 
   return (
@@ -187,32 +159,40 @@ const Sidebar = () => {
 
         {/* Project List */}
         <div className="flex-1 overflow-y-auto px-2 scrollbar-thin">
-          <div className="space-y-0.5">
-            {filteredProjects.length > 0 ? (
-              filteredProjects.map((project, index) => (
-                <ProjectItem
-                  key={`${project.name}-${index}`}
-                  icon={project.icon}
-                  name={project.name}
-                  author={project.author}
-                  isActive={project.isActive}
-                  onRename={() => handleRename(project.name, index)}
-                  onDelete={() => handleDelete(project.name, index)}
-                  onCopy={() => handleCopy(project.name)}
-                  onExport={() => handleExport(project.name)}
-                  onShare={() => handleShare(project.name)}
-                  onFavorite={() => handleFavorite(project.name)}
-                  onOpen={() => handleOpen(project.name, index)}
-                />
-              ))
-            ) : (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>未找到匹配的项目</p>
-                <p className="text-xs mt-1">尝试其他搜索关键词</p>
-              </div>
-            )}
-          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {filteredProjects.length > 0 ? (
+                filteredProjects.map((project) => (
+                  <ProjectItem
+                    key={project.id}
+                    icon={project.icon}
+                    name={project.name}
+                    author={project.author}
+                    isActive={project.id === activeProject?.id}
+                    onRename={() => handleRename(project)}
+                    onDelete={() => handleDelete(project)}
+                    onCopy={() => handleCopy(project.name)}
+                    onExport={() => handleExport(project.name)}
+                    onShare={() => handleShare(project.name)}
+                    onFavorite={() => handleFavorite(project.name)}
+                    onOpen={() => handleOpen(project)}
+                  />
+                ))
+              ) : (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>{projects.length === 0 ? "暂无项目" : "未找到匹配的项目"}</p>
+                  <p className="text-xs mt-1">
+                    {projects.length === 0 ? "点击上方按钮创建新项目" : "尝试其他搜索关键词"}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* User Section */}

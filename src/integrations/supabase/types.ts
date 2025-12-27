@@ -14,7 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      messages: {
+        Row: {
+          agent_id: string | null
+          content: string
+          created_at: string
+          files: Json | null
+          id: string
+          project_id: string
+          role: string
+        }
+        Insert: {
+          agent_id?: string | null
+          content: string
+          created_at?: string
+          files?: Json | null
+          id?: string
+          project_id: string
+          role: string
+        }
+        Update: {
+          agent_id?: string | null
+          content?: string
+          created_at?: string
+          files?: Json | null
+          id?: string
+          project_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          author: string
+          context_path: string | null
+          created_at: string
+          description: string | null
+          icon: string
+          id: string
+          is_active: boolean | null
+          name: string
+          selected_agents: string[] | null
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          author: string
+          context_path?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          selected_agents?: string[] | null
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          author?: string
+          context_path?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          selected_agents?: string[] | null
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
