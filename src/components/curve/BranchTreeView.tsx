@@ -50,25 +50,30 @@ const BranchTreeView = ({
   const canvasRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Extract conclusion and question from messages
-  const extractBranchSummary = useCallback((branchId: string): { conclusion: string; question: string } => {
+  // Extract conclusion and question from messages - enhanced for main branch
+  const extractBranchSummary = useCallback((branchId: string, isMain: boolean): { conclusion: string; question: string } => {
     const messages = messagesByBranch[branchId] || [];
     
     const firstUserMessage = messages.find(m => m.role === 'user');
-    const question = firstUserMessage?.content?.slice(0, 80) || '';
+    // Main branch gets longer question preview
+    const questionMaxLen = isMain ? 120 : 80;
+    const question = firstUserMessage?.content?.slice(0, questionMaxLen) || '';
     
     const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
     let conclusion = '';
     
+    // Main branch gets longer conclusion preview
+    const conclusionMaxLen = isMain ? 200 : 150;
+    
     if (lastAssistantMessage?.content) {
       const conclusionMatch = lastAssistantMessage.content.match(/<conclusion>([\s\S]*?)<\/conclusion>/);
       if (conclusionMatch) {
-        conclusion = conclusionMatch[1].trim().slice(0, 150);
+        conclusion = conclusionMatch[1].trim().slice(0, conclusionMaxLen);
       } else {
         conclusion = lastAssistantMessage.content
           .replace(/<[^>]+>/g, '')
           .split('\n')
-          .find(line => line.trim().length > 20)?.slice(0, 150) || '';
+          .find(line => line.trim().length > 20)?.slice(0, conclusionMaxLen) || '';
       }
     }
     
@@ -81,7 +86,7 @@ const BranchTreeView = ({
     const roots: BranchNode[] = [];
 
     branches.forEach((branch) => {
-      const summary = extractBranchSummary(branch.id);
+      const summary = extractBranchSummary(branch.id, branch.is_main);
       nodeMap.set(branch.id, {
         ...branch,
         children: [],
@@ -224,15 +229,17 @@ const BranchTreeView = ({
             </div>
           )}
 
-          {/* Branch Card */}
+          {/* Branch Card - Main branch gets wider card */}
           <div
             className={cn(
-              "group relative w-72 rounded-xl border-2 cursor-pointer transition-all duration-200",
+              "group relative rounded-xl border-2 cursor-pointer transition-all duration-200",
               "bg-card/95 backdrop-blur-sm hover:bg-accent/30 hover:border-primary/50 hover:shadow-xl hover:-translate-y-0.5",
               isSelected 
                 ? "border-primary shadow-xl shadow-primary/15 bg-primary/5" 
                 : "border-border/60 shadow-md",
-              node.is_main && "ring-2 ring-primary/30"
+              node.is_main 
+                ? "w-80 ring-2 ring-primary/30 border-primary/40" 
+                : "w-72"
             )}
             onClick={() => onSelectBranch(node.id)}
           >
@@ -290,16 +297,35 @@ const BranchTreeView = ({
               </Tooltip>
             </div>
 
-            {/* Card Content */}
-            <div className="px-3 py-3 space-y-2.5 min-h-[60px]">
+            {/* Card Content - Enhanced for main branch */}
+            <div className={cn(
+              "px-3 py-3 space-y-2.5",
+              node.is_main ? "min-h-[100px]" : "min-h-[60px]"
+            )}>
+              {/* Main branch shows conversation thread summary */}
+              {node.is_main && node.messageCount && node.messageCount > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 text-[10px] font-medium text-primary">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    <span>会话主线</span>
+                  </div>
+                </div>
+              )}
+
               {node.firstQuestion && (
                 <div className="flex items-start gap-2">
                   <div className="w-5 h-5 rounded-md bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                     <HelpCircle className="w-3 h-3 text-blue-500" />
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {node.firstQuestion}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-muted-foreground mb-0.5">提问</p>
+                    <p className={cn(
+                      "text-xs text-foreground/90",
+                      node.is_main ? "line-clamp-3" : "line-clamp-2"
+                    )}>
+                      {node.firstQuestion}
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -308,9 +334,15 @@ const BranchTreeView = ({
                   <div className="w-5 h-5 rounded-md bg-amber-500/10 flex items-center justify-center flex-shrink-0">
                     <Sparkles className="w-3 h-3 text-amber-500" />
                   </div>
-                  <p className="text-xs text-foreground/80 line-clamp-2">
-                    {node.lastMessage}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-muted-foreground mb-0.5">结论</p>
+                    <p className={cn(
+                      "text-xs text-foreground/80",
+                      node.is_main ? "line-clamp-3" : "line-clamp-2"
+                    )}>
+                      {node.lastMessage}
+                    </p>
+                  </div>
                 </div>
               )}
 
