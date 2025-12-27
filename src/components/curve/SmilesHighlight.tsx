@@ -100,26 +100,51 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
   }, [showPopover, smiles, moleculeInfo, infoLoading]);
 
   const handleMouseEnter = () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     
     // Calculate position based on trigger element
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       setPopoverPosition({
-        top: rect.bottom + window.scrollY + 8,
-        left: rect.left + window.scrollX,
+        top: rect.bottom + 4, // Reduced gap to prevent flicker
+        left: rect.left,
       });
     }
     
-    setShowPopover(true);
-    setImageLoading(true);
-    setImageError(false);
+    if (!showPopover) {
+      setShowPopover(true);
+      setImageLoading(true);
+      setImageError(false);
+    }
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (e: React.MouseEvent) => {
+    // Don't close immediately - allow time to move to popover
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
     timeoutRef.current = setTimeout(() => {
       setShowPopover(false);
-    }, 300);
+    }, 150);
+  };
+
+  const handlePopoverMouseEnter = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  const handlePopoverMouseLeave = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => {
+      setShowPopover(false);
+    }, 150);
   };
 
   const handleCopy = async (e: React.MouseEvent) => {
@@ -194,12 +219,12 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
       {/* Molecule structure popover - using portal to escape overflow containers */}
       {showPopover && popoverPosition && createPortal(
         <div
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
+          onMouseEnter={handlePopoverMouseEnter}
+          onMouseLeave={handlePopoverMouseLeave}
           style={{
             position: 'fixed',
-            top: popoverPosition.top - window.scrollY,
-            left: popoverPosition.left - window.scrollX,
+            top: popoverPosition.top,
+            left: popoverPosition.left,
             zIndex: 9999,
           }}
           className={cn(
