@@ -3,8 +3,9 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Copy, Check } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, ReactNode, Fragment } from "react";
 import { cn } from "@/lib/utils";
+import SmilesHighlight, { isValidSmiles } from "./SmilesHighlight";
 
 interface MarkdownRendererProps {
   content: string;
@@ -35,6 +36,45 @@ const CopyButton = ({ code }: { code: string }) => {
   );
 };
 
+// 处理文本中的 SMILES 字符串
+const processTextWithSmiles = (text: string): ReactNode => {
+  // 匹配反引号包裹的内容
+  const backtickPattern = /`([^`]+)`/g;
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+  let keyIndex = 0;
+
+  while ((match = backtickPattern.exec(text)) !== null) {
+    // 添加匹配前的普通文本
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+
+    const candidate = match[1];
+    if (isValidSmiles(candidate)) {
+      // 是 SMILES，使用高亮组件
+      parts.push(<SmilesHighlight key={`smiles-${keyIndex++}`} smiles={candidate} />);
+    } else {
+      // 不是 SMILES，保持原样显示为行内代码
+      parts.push(
+        <code key={`code-${keyIndex++}`} className="px-1.5 py-0.5 rounded-md bg-muted text-foreground font-mono text-sm">
+          {candidate}
+        </code>
+      );
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // 添加剩余文本
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? <Fragment>{parts}</Fragment> : text;
+};
+
 const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) => {
   const isDark = document.documentElement.classList.contains("dark");
 
@@ -49,6 +89,11 @@ const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) => {
             const isInline = !match && !String(children).includes("\n");
             
             if (match) {
+              // 检查是否是 SMILES 语言标记
+              if (match[1] === "smiles" && isValidSmiles(codeString)) {
+                return <SmilesHighlight smiles={codeString} />;
+              }
+              
               return (
                 <div className="group relative my-3 rounded-lg overflow-hidden border border-border/50">
                   <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
@@ -76,6 +121,11 @@ const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) => {
             }
 
             if (isInline) {
+              // 检查行内代码是否是 SMILES
+              if (isValidSmiles(codeString)) {
+                return <SmilesHighlight smiles={codeString} />;
+              }
+              
               return (
                 <code
                   className="px-1.5 py-0.5 rounded-md bg-muted text-foreground font-mono text-sm"
@@ -94,6 +144,13 @@ const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) => {
                 {children}
               </code>
             );
+          },
+          // 处理普通文本中的 SMILES
+          text({ children }) {
+            if (typeof children === "string") {
+              return <>{processTextWithSmiles(children)}</>;
+            }
+            return <>{children}</>;
           },
           table({ children }) {
             return (
