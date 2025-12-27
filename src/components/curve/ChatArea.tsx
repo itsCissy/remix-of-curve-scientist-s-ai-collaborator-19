@@ -3,6 +3,7 @@ import ChatHeader from "./ChatHeader";
 import UserMessage from "./UserMessage";
 import AgentMessage from "./AgentMessage";
 import ChatInput from "./ChatInput";
+import AgentSwitchDialog from "./AgentSwitchDialog";
 import { Message, parseMessageContent, generateId } from "@/lib/messageUtils";
 import { Agent, DEFAULT_AGENT } from "@/lib/agents";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +14,8 @@ const ChatArea = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<Agent>(DEFAULT_AGENT);
+  const [pendingAgent, setPendingAgent] = useState<Agent | null>(null);
+  const [showSwitchDialog, setShowSwitchDialog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -25,11 +28,35 @@ const ChatArea = () => {
   }, [messages]);
 
   const handleAgentChange = (agent: Agent) => {
-    setSelectedAgent(agent);
+    if (agent.id === selectedAgent.id) return;
+    
+    if (messages.length > 0) {
+      setPendingAgent(agent);
+      setShowSwitchDialog(true);
+    } else {
+      setSelectedAgent(agent);
+      toast({
+        title: "已切换 Agent",
+        description: `当前使用: ${agent.name}`,
+      });
+    }
+  };
+
+  const handleSwitchConfirm = (keepHistory: boolean) => {
+    if (!pendingAgent) return;
+    
+    if (!keepHistory) {
+      setMessages([]);
+    }
+    
+    setSelectedAgent(pendingAgent);
     toast({
       title: "已切换 Agent",
-      description: `当前使用: ${agent.name}`,
+      description: `当前使用: ${pendingAgent.name}${keepHistory ? "，已保留对话记录" : ""}`,
     });
+    
+    setPendingAgent(null);
+    setShowSwitchDialog(false);
   };
 
   const handleSend = async (input: string) => {
@@ -230,6 +257,15 @@ const ChatArea = () => {
         isLoading={isLoading}
         selectedAgent={selectedAgent}
         onSelectAgent={handleAgentChange}
+      />
+
+      <AgentSwitchDialog
+        open={showSwitchDialog}
+        onOpenChange={setShowSwitchDialog}
+        fromAgent={selectedAgent}
+        toAgent={pendingAgent ?? selectedAgent}
+        messageCount={messages.length}
+        onConfirm={handleSwitchConfirm}
       />
     </div>
   );
