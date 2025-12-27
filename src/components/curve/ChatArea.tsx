@@ -180,13 +180,13 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
     setShowCreateBranchDialog(true);
   };
 
-  const handleConfirmCreateBranch = async (name: string, description?: string) => {
+  const handleConfirmCreateBranch = async (name: string, inheritContext?: boolean) => {
     if (!branchPointMessageId) return;
     
     const newBranch = await createBranch(
       branchPointMessageId,
       name,
-      description,
+      undefined, // description is no longer used
       collaborator?.id
     );
     
