@@ -15,7 +15,7 @@ const Index = () => {
   } = useProjects();
 
   return (
-    <div className="flex min-h-screen w-full">
+    <>
       <Sidebar 
         projects={projects}
         isLoading={isLoading}
@@ -29,7 +29,7 @@ const Index = () => {
         projectId={activeProject?.id || null}
         projectName={activeProject?.name || "New Project"}
       />
-    </div>
+    </>
   );
 };
 
