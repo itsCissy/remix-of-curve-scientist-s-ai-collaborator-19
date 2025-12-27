@@ -244,6 +244,7 @@ const ChatArea = () => {
                   content={message.content}
                   parsedContent={parseMessageContent(message.content)}
                   isStreaming={message.isStreaming}
+                  files={message.files}
                 />
               )
             )
