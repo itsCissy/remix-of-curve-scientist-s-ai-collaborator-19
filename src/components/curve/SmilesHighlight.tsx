@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Copy, Check, Loader2, Download, FlaskConical, Scale } from "lucide-react";
 
@@ -84,6 +85,8 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
   const [moleculeInfo, setMoleculeInfo] = useState<MoleculeInfo | null>(null);
   const [infoLoading, setInfoLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -98,6 +101,16 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    
+    // Calculate position based on trigger element
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPopoverPosition({
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.left + window.scrollX,
+      });
+    }
+    
     setShowPopover(true);
     setImageLoading(true);
     setImageError(false);
@@ -144,8 +157,9 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
   };
 
   return (
-    <span className="relative inline-block">
+    <span className="inline-block">
       <span
+        ref={triggerRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={cn(
@@ -177,13 +191,18 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
         </button>
       </span>
 
-      {/* Molecule structure popover */}
-      {showPopover && (
+      {/* Molecule structure popover - using portal to escape overflow containers */}
+      {showPopover && popoverPosition && createPortal(
         <div
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
+          style={{
+            position: 'fixed',
+            top: popoverPosition.top - window.scrollY,
+            left: popoverPosition.left - window.scrollX,
+            zIndex: 9999,
+          }}
           className={cn(
-            "absolute z-50 left-0 top-full mt-2",
             "bg-card border border-border rounded-lg shadow-xl",
             "p-3 animate-fade-in",
             "min-w-[280px] max-w-[320px]"
@@ -307,7 +326,8 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
           <div className="mt-2 text-xs text-muted-foreground font-mono break-all bg-muted/50 rounded px-2 py-1">
             {smiles}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   );
