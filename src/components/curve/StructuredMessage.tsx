@@ -353,7 +353,7 @@ const StructuredMessage = ({
             <ConclusionSection 
               key={conclusionKey}
               content={conclusion} 
-              enableTypewriter={!isStreaming}
+              enableTypewriter={Boolean(isStreaming)}
             />
           )}
         </div>
