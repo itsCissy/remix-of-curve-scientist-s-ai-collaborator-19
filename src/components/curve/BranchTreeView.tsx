@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Branch, Collaborator } from "@/hooks/useBranches";
-import { GitBranch, MessageSquare, Trash2, ArrowLeft, ZoomIn, ZoomOut, Maximize2, GitMerge, Move } from "lucide-react";
+import { GitBranch, MessageSquare, Trash2, ArrowLeft, ZoomIn, ZoomOut, Maximize2, Plus, Clock, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +8,17 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Slider } from "@/components/ui/slider";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 interface BranchNode extends Branch {
   children: BranchNode[];
@@ -27,6 +37,7 @@ interface BranchTreeViewProps {
   onBack: () => void;
   messageCountByBranch?: Record<string, number>;
   messagesByBranch?: Record<string, { content: string; role: string }[]>;
+  onCreateBranch?: (parentBranchId: string, name: string, inheritContext: boolean) => void;
 }
 
 const BranchTreeView = ({
@@ -39,38 +50,52 @@ const BranchTreeView = ({
   onBack,
   messageCountByBranch = {},
   messagesByBranch = {},
+  onCreateBranch,
 }: BranchTreeViewProps) => {
   // Canvas pan and zoom state
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 50, y: 50 });
+  const [scale, setScale] = useState(0.85);
+  const [position, setPosition] = useState({ x: 80, y: 80 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
+  
+  // Create branch dialog state
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [parentBranchId, setParentBranchId] = useState<string | null>(null);
+  const [newBranchName, setNewBranchName] = useState("");
+  const [inheritContext, setInheritContext] = useState(true);
 
-  // Extract summary and questions from messages
+  // Animation state for connection lines
+  const [animationOffset, setAnimationOffset] = useState(0);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAnimationOffset(prev => (prev + 1) % 100);
+    }, 50);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Extract summary from messages
   const extractBranchData = useCallback((branchId: string): { summary: string; questions: string[] } => {
     const messages = messagesByBranch[branchId] || [];
     
-    // Extract user questions (first 3)
     const userMessages = messages.filter(m => m.role === 'user');
     const questions = userMessages.slice(0, 3).map(m => {
       const text = m.content?.slice(0, 50) || '';
       return text.length >= 50 ? text + '...' : text;
     });
     
-    // Extract summary from last assistant message
     let summary = '';
     const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
     
     if (lastAssistantMessage?.content) {
       const conclusionMatch = lastAssistantMessage.content.match(/<conclusion>([\s\S]*?)<\/conclusion>/);
       if (conclusionMatch) {
-        summary = conclusionMatch[1].trim().slice(0, 300);
+        summary = conclusionMatch[1].trim().slice(0, 200);
       } else {
-        // Extract first meaningful paragraph
         const cleanContent = lastAssistantMessage.content.replace(/<[^>]+>/g, '');
         const paragraphs = cleanContent.split('\n').filter(p => p.trim().length > 20);
-        summary = paragraphs.slice(0, 3).join(' ').slice(0, 300);
+        summary = paragraphs.slice(0, 2).join(' ').slice(0, 200);
       }
     }
     
@@ -130,38 +155,55 @@ const BranchTreeView = ({
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      setScale((prev) => Math.min(Math.max(prev + delta, 0.25), 2));
+      setScale((prev) => Math.min(Math.max(prev + delta, 0.3), 2));
     }
   };
 
-  const zoomIn = () => setScale((prev) => Math.min(prev + 0.2, 2));
-  const zoomOut = () => setScale((prev) => Math.max(prev - 0.2, 0.25));
+  const zoomIn = () => setScale((prev) => Math.min(prev + 0.15, 2));
+  const zoomOut = () => setScale((prev) => Math.max(prev - 0.15, 0.3));
   const resetView = () => {
-    setScale(1);
-    setPosition({ x: 50, y: 50 });
+    setScale(0.85);
+    setPosition({ x: 80, y: 80 });
   };
 
-  const getCollaboratorName = (collaboratorId: string | null): string => {
-    if (!collaboratorId) return "系统";
-    const collab = collaborators.find((c) => c.id === collaboratorId);
-    return collab?.name || "未知用户";
+  // Format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('zh-CN', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  const getCollaboratorColor = (collaboratorId: string | null): string => {
-    if (!collaboratorId) return "hsl(var(--muted-foreground))";
-    const collab = collaborators.find((c) => c.id === collaboratorId);
-    return collab?.avatar_color || "hsl(var(--muted-foreground))";
+  // Handle create branch click
+  const handleCreateBranchClick = (branchId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setParentBranchId(branchId);
+    setNewBranchName("");
+    setInheritContext(true);
+    setShowCreateDialog(true);
   };
 
-  // Card dimensions for layout
-  const CARD_WIDTH = 360;
-  const CARD_GAP_X = 120;
-  const CARD_GAP_Y = 40;
+  const handleConfirmCreateBranch = () => {
+    if (parentBranchId && newBranchName.trim() && onCreateBranch) {
+      onCreateBranch(parentBranchId, newBranchName.trim(), inheritContext);
+    }
+    setShowCreateDialog(false);
+    setParentBranchId(null);
+    setNewBranchName("");
+  };
 
-  // Render single branch card
+  // Card dimensions
+  const CARD_WIDTH = 320;
+  const CARD_HEIGHT = 200;
+  const CARD_GAP_X = 140;
+  const CARD_GAP_Y = 60;
+
+  // Render single branch card with glassmorphism
   const renderCard = (node: BranchNode, x: number, y: number) => {
     const isSelected = node.id === currentBranchId;
-    const canMerge = !node.is_main && onMergeBranch;
     const isMainBranch = node.is_main;
 
     return (
@@ -170,79 +212,66 @@ const BranchTreeView = ({
         className={cn(
           "absolute group cursor-pointer transition-all duration-300 ease-out",
           "rounded-2xl overflow-hidden",
-          "hover:-translate-y-1.5 hover:shadow-2xl",
+          "hover:-translate-y-2 hover:shadow-2xl",
+          // Glassmorphism effect
+          "backdrop-blur-xl",
           isMainBranch 
-            ? "bg-gradient-to-br from-primary/5 via-card to-card border-2 border-primary/30 shadow-lg shadow-primary/10" 
-            : "bg-card border border-border/60 shadow-md",
+            ? "bg-primary/10 border-2 border-primary/40 shadow-lg shadow-primary/20" 
+            : "bg-card/60 border border-border/40 shadow-lg",
           isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
         )}
         style={{
           left: x,
           top: y,
           width: CARD_WIDTH,
+          height: CARD_HEIGHT,
         }}
-        onClick={() => onSelectBranch(node.id)}
+        onDoubleClick={() => onSelectBranch(node.id)}
       >
-        {/* Main branch glow effect */}
-        {isMainBranch && (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent pointer-events-none" />
-        )}
+        {/* Background gradient overlay */}
+        <div className={cn(
+          "absolute inset-0 opacity-60 pointer-events-none",
+          isMainBranch 
+            ? "bg-gradient-to-br from-primary/15 via-transparent to-primary/5" 
+            : "bg-gradient-to-br from-muted/30 via-transparent to-muted/10"
+        )} />
         
         {/* Card Header */}
         <div className={cn(
-          "relative flex items-center justify-between px-4 py-3.5",
+          "relative flex items-center justify-between px-4 py-3",
           isMainBranch 
-            ? "bg-gradient-to-r from-primary/10 to-transparent border-b border-primary/20" 
-            : "border-b border-border/50"
+            ? "border-b border-primary/20" 
+            : "border-b border-border/30"
         )}>
           <div className="flex items-center gap-3">
             {/* Branch icon */}
             <div className={cn(
-              "w-9 h-9 rounded-xl flex items-center justify-center shadow-sm",
+              "w-10 h-10 rounded-xl flex items-center justify-center",
+              "backdrop-blur-sm",
               isMainBranch 
-                ? "bg-primary text-primary-foreground" 
-                : "bg-muted text-muted-foreground"
+                ? "bg-primary/20 text-primary border border-primary/30" 
+                : "bg-muted/50 text-muted-foreground border border-border/30"
             )}>
-              <GitBranch className="w-4.5 h-4.5" />
+              {isMainBranch ? <Sparkles className="w-5 h-5" /> : <GitBranch className="w-5 h-5" />}
             </div>
             
             <div className="flex flex-col">
               <span className={cn(
-                "font-bold text-base",
+                "font-bold text-base leading-tight",
                 isMainBranch ? "text-primary" : "text-foreground"
               )}>
                 {node.name}
               </span>
               {isMainBranch && (
                 <span className="text-[10px] text-primary/70 font-medium">
-                  核心对话线程
+                  主线会话
                 </span>
               )}
             </div>
           </div>
-          
-          <div className="flex items-center gap-1.5">
-            {/* Merge button */}
-            {canMerge && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMergeBranch(node.id, node.summary);
-                    }}
-                    className="p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-primary/15 transition-all duration-200"
-                  >
-                    <GitMerge className="w-4 h-4 text-primary" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>合并到主线</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-            
-            {/* Delete button */}
+
+          {/* Actions - visible on hover */}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {!node.is_main && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -251,9 +280,9 @@ const BranchTreeView = ({
                       e.stopPropagation();
                       onDeleteBranch(node.id);
                     }}
-                    className="p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-destructive/15 transition-all duration-200"
+                    className="p-1.5 rounded-lg hover:bg-destructive/15 transition-colors"
                   >
-                    <Trash2 className="w-4 h-4 text-destructive" />
+                    <Trash2 className="w-4 h-4 text-destructive/70" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
@@ -261,111 +290,80 @@ const BranchTreeView = ({
                 </TooltipContent>
               </Tooltip>
             )}
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] text-white font-semibold ml-1 shadow-sm ring-2 ring-background"
-                  style={{ backgroundColor: getCollaboratorColor(node.created_by) }}
-                >
-                  {getCollaboratorName(node.created_by).charAt(0)}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>创建者: {getCollaboratorName(node.created_by)}</p>
-              </TooltipContent>
-            </Tooltip>
           </div>
         </div>
         
         {/* Summary Content */}
-        <div className="relative px-4 py-4 min-h-[100px]">
-          <div className="absolute top-3 left-4 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
-            摘要
-          </div>
-          <div className="mt-4">
-            {node.summary ? (
-              <p className="text-sm text-foreground/80 leading-relaxed line-clamp-4">
-                {node.summary}
-              </p>
-            ) : node.description ? (
-              <p className="text-sm text-foreground/80 leading-relaxed line-clamp-4">
-                {node.description}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground/40 italic">
-                暂无会话内容
-              </p>
-            )}
-          </div>
+        <div className="relative px-4 py-3 flex-1">
+          <p className={cn(
+            "text-sm leading-relaxed line-clamp-3",
+            node.summary ? "text-foreground/80" : "text-muted-foreground/50 italic"
+          )}>
+            {node.summary || node.description || "暂无会话内容，双击进入开始对话"}
+          </p>
         </div>
-        
-        {/* Questions List */}
-        {node.questions && node.questions.length > 0 && (
-          <div className="px-4 pb-3 space-y-2">
-            <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2">
-              提问记录
-            </div>
-            {node.questions.map((question, idx) => (
-              <div 
-                key={idx} 
-                className="flex items-center gap-2.5 p-2 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors"
-              >
-                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-[10px] text-primary font-bold">{idx + 1}</span>
-                </div>
-                <span className="text-xs text-foreground/70 truncate flex-1">
-                  {question}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
         
         {/* Footer */}
         <div className={cn(
-          "flex items-center justify-between px-4 py-2.5",
-          isMainBranch 
-            ? "bg-primary/5 border-t border-primary/10" 
-            : "bg-muted/40 border-t border-border/30"
+          "absolute bottom-0 left-0 right-0 flex items-center justify-between px-4 py-2.5",
+          "border-t",
+          isMainBranch ? "border-primary/15 bg-primary/5" : "border-border/20 bg-muted/20"
         )}>
-          <div className="flex items-center gap-2 text-xs">
-            <div className={cn(
-              "flex items-center gap-1.5 px-2 py-1 rounded-md",
-              isMainBranch ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-            )}>
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span className="font-medium">{node.messageCount || 0}</span>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              <span>{formatDate(node.created_at)}</span>
             </div>
-            <span className="text-muted-foreground/60">条消息</span>
+            <div className="flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>{node.messageCount || 0}</span>
+            </div>
           </div>
+          
           {node.children.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-accent/60 px-2 py-1 rounded-md">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">
               <GitBranch className="w-3 h-3" />
-              <span>{node.children.length} 子分支</span>
+              <span>{node.children.length}</span>
             </div>
           )}
         </div>
 
+        {/* Create branch button - visible on hover */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={(e) => handleCreateBranchClick(node.id, e)}
+              className={cn(
+                "absolute -right-3 top-1/2 -translate-y-1/2",
+                "w-8 h-8 rounded-full",
+                "bg-primary text-primary-foreground",
+                "flex items-center justify-center",
+                "shadow-lg shadow-primary/30",
+                "opacity-0 group-hover:opacity-100 group-hover:translate-x-0 translate-x-2",
+                "transition-all duration-300",
+                "hover:scale-110 hover:shadow-xl"
+              )}
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>创建分支</p>
+          </TooltipContent>
+        </Tooltip>
+
         {/* Selected indicator */}
         {isSelected && (
-          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-16 bg-gradient-to-b from-primary via-primary to-primary/50 rounded-r-full shadow-lg shadow-primary/30" />
+          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-gradient-to-b from-primary via-primary to-primary/50 rounded-r-full" />
         )}
         
-        {/* Hover border glow */}
-        <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none border-2 border-primary/20" />
+        {/* Hover glow effect */}
+        <div className={cn(
+          "absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none",
+          isMainBranch ? "shadow-[inset_0_0_30px_rgba(var(--primary),0.1)]" : "shadow-[inset_0_0_30px_rgba(255,255,255,0.05)]"
+        )} />
       </div>
     );
-  };
-
-  // Calculate card heights
-  const calculateCardHeight = (node: BranchNode): number => {
-    let height = 140; // header + footer (increased)
-    height += 100; // summary area (increased)
-    if (node.questions && node.questions.length > 0) {
-      height += node.questions.length * 40 + 32; // questions with padding
-    }
-    return height;
   };
 
   // Render tree with positions
@@ -373,52 +371,48 @@ const BranchTreeView = ({
     if (buildTree.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground">
-          <div className="w-20 h-20 rounded-2xl bg-muted/50 flex items-center justify-center mb-4 shadow-lg">
-            <GitBranch className="w-10 h-10 opacity-40" />
+          <div className="w-24 h-24 rounded-2xl bg-muted/30 backdrop-blur-sm flex items-center justify-center mb-6 border border-border/30">
+            <GitBranch className="w-12 h-12 opacity-40" />
           </div>
-          <p className="font-medium text-lg">暂无分支</p>
-          <p className="text-sm mt-1">发送消息后将自动创建主线分支</p>
+          <p className="font-semibold text-xl text-foreground/80">暂无会话分支</p>
+          <p className="text-sm mt-2 text-muted-foreground/70">发送消息后将自动创建主线分支</p>
         </div>
       );
     }
 
     // Layout calculation
-    const positions: { node: BranchNode; x: number; y: number; height: number }[] = [];
-    const connections: { fromX: number; fromY: number; toX: number; toY: number }[] = [];
+    const positions: { node: BranchNode; x: number; y: number }[] = [];
+    const connections: { fromX: number; fromY: number; toX: number; toY: number; isMain: boolean }[] = [];
     
     const layoutNode = (node: BranchNode, depth: number, startY: number): number => {
-      const height = calculateCardHeight(node);
       const x = depth * (CARD_WIDTH + CARD_GAP_X);
       
       if (node.children.length === 0) {
-        positions.push({ node, x, y: startY, height });
-        return startY + height + CARD_GAP_Y;
+        positions.push({ node, x, y: startY });
+        return startY + CARD_HEIGHT + CARD_GAP_Y;
       }
       
-      // Layout children first
       let childY = startY;
-      const childPositions: { y: number; height: number }[] = [];
+      const childPositions: number[] = [];
       
       node.children.forEach(child => {
         const childStart = childY;
         childY = layoutNode(child, depth + 1, childY);
         const childPos = positions.find(p => p.node.id === child.id);
         if (childPos) {
-          childPositions.push({ y: childPos.y, height: childPos.height });
+          childPositions.push(childPos.y);
         }
       });
       
       // Center parent among children
       let parentY = startY;
       if (childPositions.length > 0) {
-        const firstChildY = childPositions[0].y;
-        const lastChildY = childPositions[childPositions.length - 1].y;
-        const lastChildHeight = childPositions[childPositions.length - 1].height;
-        parentY = (firstChildY + lastChildY + lastChildHeight) / 2 - height / 2;
+        const avgChildY = childPositions.reduce((a, b) => a + b, 0) / childPositions.length;
+        parentY = avgChildY;
         parentY = Math.max(startY, parentY);
       }
       
-      positions.push({ node, x, y: parentY, height });
+      positions.push({ node, x, y: parentY });
       
       // Add connections to children
       node.children.forEach(child => {
@@ -426,9 +420,10 @@ const BranchTreeView = ({
         if (childPos) {
           connections.push({
             fromX: x + CARD_WIDTH,
-            fromY: parentY + height / 2,
+            fromY: parentY + CARD_HEIGHT / 2,
             toX: childPos.x,
-            toY: childPos.y + childPos.height / 2,
+            toY: childPos.y + CARD_HEIGHT / 2,
+            isMain: node.is_main,
           });
         }
       });
@@ -436,7 +431,6 @@ const BranchTreeView = ({
       return childY;
     };
 
-    // Layout all root nodes
     let currentY = 0;
     buildTree.forEach(root => {
       currentY = layoutNode(root, 0, currentY);
@@ -446,119 +440,149 @@ const BranchTreeView = ({
     let maxX = 0;
     let maxY = 0;
     positions.forEach(p => {
-      maxX = Math.max(maxX, p.x + CARD_WIDTH + 100);
-      maxY = Math.max(maxY, p.y + p.height + 100);
+      maxX = Math.max(maxX, p.x + CARD_WIDTH + 200);
+      maxY = Math.max(maxY, p.y + CARD_HEIGHT + 150);
     });
 
     return (
-      <div className="relative" style={{ width: maxX, height: maxY, minWidth: 500, minHeight: 300 }}>
-        {/* SVG connections */}
+      <div className="relative" style={{ width: maxX, height: maxY, minWidth: 600, minHeight: 400 }}>
+        {/* SVG connections with flow animation */}
         <svg 
           className="absolute inset-0 pointer-events-none" 
           style={{ width: maxX, height: maxY }}
         >
           <defs>
-            <linearGradient id="connectionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.4" />
-              <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.2" />
-              <stop offset="100%" stopColor="hsl(var(--border))" stopOpacity="0.6" />
+            {/* Main branch gradient */}
+            <linearGradient id="mainConnectionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
+              <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.2" />
             </linearGradient>
+            
+            {/* Normal branch gradient */}
+            <linearGradient id="normalConnectionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="hsl(var(--muted-foreground))" stopOpacity="0.4" />
+              <stop offset="50%" stopColor="hsl(var(--muted-foreground))" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="hsl(var(--border))" stopOpacity="0.3" />
+            </linearGradient>
+
+            {/* Flow animation pattern */}
+            <pattern id="flowPattern" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform={`translate(${-animationOffset * 2}, 0)`}>
+              <circle cx="2" cy="10" r="1.5" fill="hsl(var(--primary))" opacity="0.8" />
+            </pattern>
           </defs>
+          
           {connections.map((conn, idx) => {
             const midX = (conn.fromX + conn.toX) / 2;
-            const path = `M ${conn.fromX} ${conn.fromY} C ${midX} ${conn.fromY}, ${midX} ${conn.toY}, ${conn.toX} ${conn.toY}`;
+            const path = `M ${conn.fromX} ${conn.fromY} C ${midX + 40} ${conn.fromY}, ${midX - 40} ${conn.toY}, ${conn.toX} ${conn.toY}`;
+            
             return (
               <g key={idx}>
-                {/* Shadow line */}
+                {/* Glow effect */}
                 <path
                   d={path}
                   fill="none"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth="6"
+                  stroke={conn.isMain ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"}
+                  strokeWidth="8"
                   opacity="0.1"
                   strokeLinecap="round"
                 />
+                
                 {/* Main line */}
                 <path
                   d={path}
                   fill="none"
-                  stroke="url(#connectionGradient)"
+                  stroke={conn.isMain ? "url(#mainConnectionGradient)" : "url(#normalConnectionGradient)"}
                   strokeWidth="2.5"
                   strokeLinecap="round"
                 />
-                {/* Connection dot at end */}
-                <circle
-                  cx={conn.toX}
-                  cy={conn.toY}
-                  r="4"
-                  fill="hsl(var(--primary))"
-                  opacity="0.6"
+                
+                {/* Flow animation dots */}
+                {conn.isMain && (
+                  <path
+                    d={path}
+                    fill="none"
+                    stroke="url(#flowPattern)"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    opacity="0.6"
+                  />
+                )}
+                
+                {/* End dot */}
+                <circle 
+                  cx={conn.toX} 
+                  cy={conn.toY} 
+                  r="5" 
+                  fill={conn.isMain ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"} 
+                  opacity="0.5"
                 />
               </g>
             );
           })}
         </svg>
         
-        {/* Cards */}
+        {/* Render cards */}
         {positions.map(({ node, x, y }) => renderCard(node, x, y))}
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="flex-1 flex flex-col h-screen bg-background overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b bg-card/80 backdrop-blur-sm z-10">
-        <Button variant="ghost" size="icon" onClick={onBack} className="hover:bg-accent">
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div className="flex-1">
-          <h2 className="font-semibold text-foreground">分支视图</h2>
-          <p className="text-xs text-muted-foreground">
-            共 {branches.length} 个分支 · 拖拽画布导航 · Ctrl+滚轮缩放
-          </p>
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm z-10">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            返回对话
+          </Button>
+          <div className="h-5 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <GitBranch className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-base font-semibold text-foreground">分支视图</h1>
+              <p className="text-xs text-muted-foreground">{branches.length} 个会话分支</p>
+            </div>
+          </div>
         </div>
-
+        
         {/* Zoom controls */}
-        <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-2 py-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={zoomOut} className="h-7 w-7">
-                <ZoomOut className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>缩小</TooltipContent>
-          </Tooltip>
-          
-          <div className="w-24">
-            <Slider
-              value={[scale * 100]}
-              min={25}
-              max={200}
-              step={5}
-              onValueChange={([v]) => setScale(v / 100)}
-              className="cursor-pointer"
-            />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 border border-border/30">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomOut}>
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>缩小</TooltipContent>
+            </Tooltip>
+            
+            <span className="text-xs font-medium text-muted-foreground w-12 text-center">
+              {Math.round(scale * 100)}%
+            </span>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomIn}>
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>放大</TooltipContent>
+            </Tooltip>
           </div>
           
-          <span className="text-xs text-muted-foreground w-10 text-center">
-            {Math.round(scale * 100)}%
-          </span>
-          
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={zoomIn} className="h-7 w-7">
-                <ZoomIn className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>放大</TooltipContent>
-          </Tooltip>
-          
-          <div className="w-px h-4 bg-border" />
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={resetView} className="h-7 w-7">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetView}>
                 <Maximize2 className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
@@ -566,8 +590,8 @@ const BranchTreeView = ({
           </Tooltip>
         </div>
       </div>
-
-      {/* Canvas area */}
+      
+      {/* Infinite canvas */}
       <div 
         ref={canvasRef}
         className={cn(
@@ -581,35 +605,92 @@ const BranchTreeView = ({
         onWheel={handleWheel}
         data-canvas-bg
       >
-        {/* Dot grid background */}
+        {/* Grid background */}
         <div 
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: `radial-gradient(circle, hsl(var(--border)) 1px, transparent 1px)`,
-            backgroundSize: `${24 * scale}px ${24 * scale}px`,
+            backgroundImage: `
+              radial-gradient(circle at 1px 1px, hsl(var(--muted-foreground) / 0.15) 1px, transparent 0)
+            `,
+            backgroundSize: `${32 * scale}px ${32 * scale}px`,
             backgroundPosition: `${position.x}px ${position.y}px`,
           }}
         />
-
-        {/* Draggable content */}
+        
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-primary/[0.02] via-transparent to-muted/[0.05]" />
+        
+        {/* Canvas content */}
         <div
-          className="absolute"
+          className="absolute origin-top-left transition-transform duration-100"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-            transformOrigin: '0 0',
           }}
         >
-          <div className="p-4">
-            {renderBranchTree()}
-          </div>
-        </div>
-
-        {/* Drag hint */}
-        <div className="absolute bottom-4 left-4 flex items-center gap-2 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border">
-          <Move className="w-3.5 h-3.5" />
-          <span>拖拽移动</span>
+          {renderBranchTree()}
         </div>
       </div>
+
+      {/* Hint text */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs text-muted-foreground/60 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-full border border-border/30">
+        双击卡片进入对话 · 拖拽画布移动 · Ctrl + 滚轮缩放
+      </div>
+
+      {/* Create Branch Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
+              创建新分支
+            </DialogTitle>
+            <DialogDescription>
+              从当前会话创建一个新的分支进行探索
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="branchName">分支名称</Label>
+              <Input
+                id="branchName"
+                value={newBranchName}
+                onChange={(e) => setNewBranchName(e.target.value)}
+                placeholder="输入分支名称..."
+                className="bg-muted/30"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/30">
+              <div className="space-y-0.5">
+                <Label htmlFor="inheritContext" className="font-medium">携带历史上下文</Label>
+                <p className="text-xs text-muted-foreground">
+                  开启后，新分支将继承父分支的对话历史
+                </p>
+              </div>
+              <Switch
+                id="inheritContext"
+                checked={inheritContext}
+                onCheckedChange={setInheritContext}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+              取消
+            </Button>
+            <Button 
+              onClick={handleConfirmCreateBranch}
+              disabled={!newBranchName.trim()}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              创建分支
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
