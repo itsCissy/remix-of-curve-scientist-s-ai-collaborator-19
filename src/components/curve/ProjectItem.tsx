@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ProjectItemProps {
   icon: string;
@@ -40,20 +41,29 @@ const ProjectItem = ({
   const [isHovered, setIsHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Collapsed view - just show icon
+  // Collapsed view - just show icon with tooltip
   if (isCollapsed) {
     return (
-      <div
-        className={`w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 mx-auto ${
-          isActive
-            ? "bg-primary/10 text-foreground"
-            : "hover:bg-curve-hover text-muted-foreground hover:text-foreground"
-        }`}
-        onClick={onOpen}
-        title={name}
-      >
-        <span className="text-base">{icon}</span>
-      </div>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          <div
+            className={`w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 mx-auto ${
+              isActive
+                ? "bg-primary/10 text-foreground"
+                : "hover:bg-curve-hover text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={onOpen}
+          >
+            <span className="text-base">{icon}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>
+          <div className="flex flex-col">
+            <span className="font-medium">{name}</span>
+            <span className="text-xs text-muted-foreground">{author}</span>
+          </div>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 

@@ -6,6 +6,7 @@ import DeleteConfirmDialog from "./DeleteConfirmDialog";
 import RenameDialog from "./RenameDialog";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Project } from "@/hooks/useProjects";
 
 interface SidebarProps {
@@ -103,24 +104,36 @@ const Sidebar = ({
         <div className={`p-2 flex ${isCollapsed ? 'flex-col items-center gap-1' : 'items-center gap-2 px-3'}`}>
           {/* Collapse Toggle - Always first when collapsed */}
           {isCollapsed && (
-            <button 
-              onClick={() => setIsCollapsed(false)}
-              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground"
-              title="展开侧边栏"
-            >
-              <PanelLeft className="w-4 h-4" />
-            </button>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button 
+                  onClick={() => setIsCollapsed(false)}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground"
+                >
+                  <PanelLeft className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                展开侧边栏
+              </TooltipContent>
+            </Tooltip>
           )}
           
           {/* New Project Button */}
           {isCollapsed ? (
-            <button 
-              onClick={() => setNewProjectOpen(true)}
-              className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-all duration-200"
-              title="New Project"
-            >
-              <SquarePen className="w-4 h-4" />
-            </button>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button 
+                  onClick={() => setNewProjectOpen(true)}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-all duration-200"
+                >
+                  <SquarePen className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                新建项目
+              </TooltipContent>
+            </Tooltip>
           ) : (
             <>
               <button 
