@@ -15,6 +15,7 @@ export interface Message {
   isStreaming?: boolean;
   files?: FileAttachment[];
   attachments?: MessageAttachment[];
+  collaboratorId?: string;
 }
 
 export interface ParsedContent {

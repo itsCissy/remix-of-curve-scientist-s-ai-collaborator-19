@@ -1,0 +1,363 @@
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+export interface Branch {
+  id: string;
+  project_id: string;
+  parent_branch_id: string | null;
+  branch_point_message_id: string | null;
+  name: string;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+  is_main: boolean;
+}
+
+export interface Collaborator {
+  id: string;
+  project_id: string;
+  name: string;
+  avatar_color: string;
+  browser_id: string;
+  created_at: string;
+}
+
+// Generate or retrieve browser ID for temporary user identification
+const getBrowserId = (): string => {
+  let browserId = localStorage.getItem("curve_browser_id");
+  if (!browserId) {
+    browserId = `browser_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    localStorage.setItem("curve_browser_id", browserId);
+  }
+  return browserId;
+};
+
+// Generate a random color for the collaborator avatar
+const getRandomColor = (): string => {
+  const colors = [
+    "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
+    "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#6366F1"
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+export const useBranches = (projectId: string | null) => {
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [currentBranch, setCurrentBranch] = useState<Branch | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchBranches = useCallback(async () => {
+    if (!projectId) {
+      setBranches([]);
+      setCurrentBranch(null);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("branches")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      const typedData = (data || []) as Branch[];
+      setBranches(typedData);
+
+      // Set current branch to main or first branch
+      const main = typedData.find((b) => b.is_main);
+      setCurrentBranch(main || typedData[0] || null);
+    } catch (error) {
+      console.error("Error fetching branches:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId]);
+
+  // Create main branch if it doesn't exist
+  const ensureMainBranch = async (): Promise<Branch | null> => {
+    if (!projectId) return null;
+
+    const existing = branches.find((b) => b.is_main);
+    if (existing) return existing;
+
+    try {
+      const { data, error } = await supabase
+        .from("branches")
+        .insert({
+          project_id: projectId,
+          name: "主线",
+          is_main: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const typedData = data as Branch;
+      setBranches((prev) => [...prev, typedData]);
+      setCurrentBranch(typedData);
+      return typedData;
+    } catch (error) {
+      console.error("Error creating main branch:", error);
+      return null;
+    }
+  };
+
+  // Create a new branch from a specific message
+  const createBranch = async (
+    messageId: string,
+    name: string,
+    description?: string,
+    collaboratorId?: string
+  ): Promise<Branch | null> => {
+    if (!projectId || !currentBranch) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from("branches")
+        .insert({
+          project_id: projectId,
+          parent_branch_id: currentBranch.id,
+          branch_point_message_id: messageId,
+          name,
+          description: description || null,
+          created_by: collaboratorId || null,
+          is_main: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const typedData = data as Branch;
+      setBranches((prev) => [...prev, typedData]);
+      toast.success(`分支 "${name}" 创建成功`);
+      return typedData;
+    } catch (error) {
+      console.error("Error creating branch:", error);
+      toast.error("创建分支失败");
+      return null;
+    }
+  };
+
+  // Switch to a different branch
+  const switchBranch = (branchId: string) => {
+    const branch = branches.find((b) => b.id === branchId);
+    if (branch) {
+      setCurrentBranch(branch);
+    }
+  };
+
+  // Delete a branch (cannot delete main branch)
+  const deleteBranch = async (branchId: string): Promise<boolean> => {
+    const branch = branches.find((b) => b.id === branchId);
+    if (!branch || branch.is_main) {
+      toast.error("无法删除主线分支");
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("branches")
+        .delete()
+        .eq("id", branchId);
+
+      if (error) throw error;
+
+      setBranches((prev) => prev.filter((b) => b.id !== branchId));
+      
+      if (currentBranch?.id === branchId) {
+        const main = branches.find((b) => b.is_main);
+        setCurrentBranch(main || null);
+      }
+      
+      toast.success("分支已删除");
+      return true;
+    } catch (error) {
+      console.error("Error deleting branch:", error);
+      toast.error("删除分支失败");
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    fetchBranches();
+  }, [fetchBranches]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!projectId) return;
+
+    const channel = supabase
+      .channel(`branches-${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "branches",
+          filter: `project_id=eq.${projectId}`,
+        },
+        () => {
+          fetchBranches();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, fetchBranches]);
+
+  return {
+    branches,
+    currentBranch,
+    isLoading,
+    ensureMainBranch,
+    createBranch,
+    switchBranch,
+    deleteBranch,
+    refetch: fetchBranches,
+  };
+};
+
+export const useCollaborator = (projectId: string | null) => {
+  const [collaborator, setCollaborator] = useState<Collaborator | null>(null);
+  const [allCollaborators, setAllCollaborators] = useState<Collaborator[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const browserId = getBrowserId();
+
+  const fetchCollaborators = useCallback(async () => {
+    if (!projectId) {
+      setAllCollaborators([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("collaborators")
+        .select("*")
+        .eq("project_id", projectId);
+
+      if (error) throw error;
+      setAllCollaborators((data || []) as Collaborator[]);
+    } catch (error) {
+      console.error("Error fetching collaborators:", error);
+    }
+  }, [projectId]);
+
+  const ensureCollaborator = useCallback(async (): Promise<Collaborator | null> => {
+    if (!projectId) return null;
+
+    setIsLoading(true);
+    try {
+      // Check if collaborator already exists
+      const { data: existing, error: fetchError } = await supabase
+        .from("collaborators")
+        .select("*")
+        .eq("project_id", projectId)
+        .eq("browser_id", browserId)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      if (existing) {
+        const typedData = existing as Collaborator;
+        setCollaborator(typedData);
+        return typedData;
+      }
+
+      // Create new collaborator
+      const { data: newCollab, error: insertError } = await supabase
+        .from("collaborators")
+        .insert({
+          project_id: projectId,
+          browser_id: browserId,
+          name: `用户 ${Math.floor(Math.random() * 1000)}`,
+          avatar_color: getRandomColor(),
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      const typedData = newCollab as Collaborator;
+      setCollaborator(typedData);
+      setAllCollaborators((prev) => [...prev, typedData]);
+      return typedData;
+    } catch (error) {
+      console.error("Error ensuring collaborator:", error);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId, browserId]);
+
+  const updateCollaboratorName = async (name: string): Promise<boolean> => {
+    if (!collaborator) return false;
+
+    try {
+      const { error } = await supabase
+        .from("collaborators")
+        .update({ name })
+        .eq("id", collaborator.id);
+
+      if (error) throw error;
+
+      setCollaborator((prev) => (prev ? { ...prev, name } : null));
+      setAllCollaborators((prev) =>
+        prev.map((c) => (c.id === collaborator.id ? { ...c, name } : c))
+      );
+      return true;
+    } catch (error) {
+      console.error("Error updating collaborator name:", error);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    if (projectId) {
+      ensureCollaborator();
+      fetchCollaborators();
+    }
+  }, [projectId, ensureCollaborator, fetchCollaborators]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!projectId) return;
+
+    const channel = supabase
+      .channel(`collaborators-${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "collaborators",
+          filter: `project_id=eq.${projectId}`,
+        },
+        () => {
+          fetchCollaborators();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, fetchCollaborators]);
+
+  return {
+    collaborator,
+    allCollaborators,
+    isLoading,
+    ensureCollaborator,
+    updateCollaboratorName,
+    refetch: fetchCollaborators,
+  };
+};

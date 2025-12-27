@@ -1,13 +1,25 @@
 import UserAvatar from "./UserAvatar";
 import { MessageAttachment } from "@/lib/messageUtils";
 import { FileText, File } from "lucide-react";
+import MessageBranchButton from "./MessageBranchButton";
+import { Collaborator } from "@/hooks/useBranches";
+import CollaboratorBadge from "./CollaboratorBadge";
 
 interface UserMessageProps {
   content: string;
   attachments?: MessageAttachment[];
+  messageId?: string;
+  onCreateBranch?: (messageId: string) => void;
+  collaborator?: Collaborator | null;
 }
 
-const UserMessage = ({ content, attachments }: UserMessageProps) => {
+const UserMessage = ({ 
+  content, 
+  attachments, 
+  messageId, 
+  onCreateBranch,
+  collaborator,
+}: UserMessageProps) => {
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
@@ -24,7 +36,14 @@ const UserMessage = ({ content, attachments }: UserMessageProps) => {
   };
 
   return (
-    <div className="flex justify-end items-start gap-3 animate-fade-in">
+    <div className="flex justify-end items-start gap-3 animate-fade-in group">
+      {/* Branch button */}
+      {messageId && onCreateBranch && (
+        <div className="flex-shrink-0 mt-1">
+          <MessageBranchButton onCreateBranch={() => onCreateBranch(messageId)} />
+        </div>
+      )}
+      
       <div className="max-w-[600px] space-y-2">
         {/* Attachments */}
         {attachments && attachments.length > 0 && (
@@ -60,8 +79,14 @@ const UserMessage = ({ content, attachments }: UserMessageProps) => {
           </div>
         )}
       </div>
+
+      {/* Avatar - show collaborator or default user */}
       <div className="flex-shrink-0">
-        <UserAvatar name="" size="md" showName={false} showMenu={false} />
+        {collaborator ? (
+          <CollaboratorBadge collaborator={collaborator} size="md" />
+        ) : (
+          <UserAvatar name="" size="md" showName={false} showMenu={false} />
+        )}
       </div>
     </div>
   );

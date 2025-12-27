@@ -1,13 +1,17 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import ChatHeader from "./ChatHeader";
 import UserMessage from "./UserMessage";
 import AgentMessage from "./AgentMessage";
 import ChatInput, { UploadedFile } from "./ChatInput";
 import AgentSwitchDialog from "./AgentSwitchDialog";
+import BranchTreeView from "./BranchTreeView";
+import CreateBranchDialog from "./CreateBranchDialog";
 import { Message as LocalMessage, parseMessageContent, generateId } from "@/lib/messageUtils";
 import { Agent, DEFAULT_AGENT } from "@/lib/agents";
 import { useToast } from "@/hooks/use-toast";
 import { useMessages } from "@/hooks/useProjects";
+import { useBranches, useCollaborator } from "@/hooks/useBranches";
+import { supabase } from "@/integrations/supabase/client";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
@@ -18,25 +22,64 @@ interface ChatAreaProps {
 
 const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
   const { messages: dbMessages, addMessage, clearMessages, isLoading: messagesLoading } = useMessages(projectId);
+  const { 
+    branches, 
+    currentBranch, 
+    ensureMainBranch, 
+    createBranch, 
+    switchBranch,
+    deleteBranch,
+  } = useBranches(projectId);
+  const { collaborator, allCollaborators, ensureCollaborator } = useCollaborator(projectId);
+  
   const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<Agent>(DEFAULT_AGENT);
   const [pendingAgent, setPendingAgent] = useState<Agent | null>(null);
   const [showSwitchDialog, setShowSwitchDialog] = useState(false);
+  const [showBranchTree, setShowBranchTree] = useState(false);
+  const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
+  const [branchPointMessageId, setBranchPointMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Sync database messages to local state
+  // Calculate message count by branch
+  const [messageCountByBranch, setMessageCountByBranch] = useState<Record<string, number>>({});
+
   useEffect(() => {
-    const mapped: LocalMessage[] = dbMessages.map((m) => ({
+    const fetchMessageCounts = async () => {
+      if (!projectId || branches.length === 0) return;
+      
+      const counts: Record<string, number> = {};
+      for (const branch of branches) {
+        const { count } = await supabase
+          .from("messages")
+          .select("*", { count: "exact", head: true })
+          .eq("branch_id", branch.id);
+        counts[branch.id] = count || 0;
+      }
+      setMessageCountByBranch(counts);
+    };
+    
+    fetchMessageCounts();
+  }, [projectId, branches]);
+
+  // Sync database messages to local state, filtered by current branch
+  useEffect(() => {
+    const filtered = currentBranch
+      ? dbMessages.filter((m) => m.branch_id === currentBranch.id || !m.branch_id)
+      : dbMessages;
+    
+    const mapped: LocalMessage[] = filtered.map((m) => ({
       id: m.id,
       role: m.role as "user" | "assistant",
       content: m.content,
       timestamp: new Date(m.created_at),
       attachments: m.files ? m.files.attachments : undefined,
+      collaboratorId: m.collaborator_id,
     }));
     setLocalMessages(mapped);
-  }, [dbMessages]);
+  }, [dbMessages, currentBranch]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -45,6 +88,14 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
   useEffect(() => {
     scrollToBottom();
   }, [localMessages]);
+
+  // Ensure main branch exists when project is loaded
+  useEffect(() => {
+    if (projectId) {
+      ensureMainBranch();
+      ensureCollaborator();
+    }
+  }, [projectId, ensureMainBranch, ensureCollaborator]);
 
   const handleAgentChange = (agent: Agent) => {
     if (agent.id === selectedAgent.id) return;
@@ -79,6 +130,28 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
     setShowSwitchDialog(false);
   };
 
+  const handleCreateBranch = (messageId: string) => {
+    setBranchPointMessageId(messageId);
+    setShowCreateBranchDialog(true);
+  };
+
+  const handleConfirmCreateBranch = async (name: string, description?: string) => {
+    if (!branchPointMessageId) return;
+    
+    const newBranch = await createBranch(
+      branchPointMessageId,
+      name,
+      description,
+      collaborator?.id
+    );
+    
+    if (newBranch) {
+      switchBranch(newBranch.id);
+    }
+    
+    setBranchPointMessageId(null);
+  };
+
   const handleSend = async (input: string, files?: UploadedFile[]) => {
     if ((!input.trim() && (!files || files.length === 0)) || isLoading) return;
     if (!projectId) {
@@ -88,6 +161,13 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
         variant: "destructive",
       });
       return;
+    }
+
+    // Ensure we have a branch
+    let branchId = currentBranch?.id;
+    if (!branchId) {
+      const mainBranch = await ensureMainBranch();
+      branchId = mainBranch?.id;
     }
 
     // Build message content with file references
@@ -111,17 +191,21 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
       content: messageContent,
       timestamp: new Date(),
       attachments,
+      collaboratorId: collaborator?.id,
     };
 
     // Add to local state immediately for UX
     setLocalMessages((prev) => [...prev, userMessage]);
     
-    // Save to database
-    await addMessage({
+    // Save to database with branch and collaborator info
+    await supabase.from("messages").insert({
+      project_id: projectId,
       role: "user",
       content: messageContent,
       agent_id: selectedAgent.id,
       files: attachments.length > 0 ? { attachments } : null,
+      branch_id: branchId,
+      collaborator_id: collaborator?.id,
     });
 
     setIsLoading(true);
@@ -259,12 +343,14 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
         prev.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
       );
 
-      // Save assistant message to database
+      // Save assistant message to database with branch info
       if (assistantContent) {
-        await addMessage({
+        await supabase.from("messages").insert({
+          project_id: projectId,
           role: "assistant",
           content: assistantContent,
           agent_id: selectedAgent.id,
+          branch_id: branchId,
         });
       }
     } catch (error) {
@@ -279,9 +365,38 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
     }
   };
 
+  // Get collaborator for a message
+  const getCollaboratorForMessage = (collaboratorId?: string) => {
+    if (!collaboratorId) return null;
+    return allCollaborators.find((c) => c.id === collaboratorId) || null;
+  };
+
+  // Show branch tree view
+  if (showBranchTree) {
+    return (
+      <BranchTreeView
+        branches={branches}
+        collaborators={allCollaborators}
+        currentBranchId={currentBranch?.id || null}
+        onSelectBranch={(branchId) => {
+          switchBranch(branchId);
+          setShowBranchTree(false);
+        }}
+        onDeleteBranch={deleteBranch}
+        onBack={() => setShowBranchTree(false)}
+        messageCountByBranch={messageCountByBranch}
+      />
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col h-screen bg-background">
-      <ChatHeader projectName={projectName} />
+      <ChatHeader 
+        projectName={projectName}
+        currentBranch={currentBranch}
+        collaborators={allCollaborators}
+        onShowBranchTree={() => setShowBranchTree(true)}
+      />
 
       <div className="flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
         <div className="max-w-[900px] mx-auto space-y-6">
@@ -304,6 +419,9 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
                   key={message.id} 
                   content={message.content}
                   attachments={message.attachments}
+                  messageId={message.id}
+                  onCreateBranch={handleCreateBranch}
+                  collaborator={getCollaboratorForMessage(message.collaboratorId)}
                 />
               ) : (
                 <AgentMessage
@@ -312,6 +430,8 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
                   parsedContent={parseMessageContent(message.content)}
                   isStreaming={message.isStreaming}
                   files={message.files}
+                  messageId={message.id}
+                  onCreateBranch={handleCreateBranch}
                 />
               )
             )
@@ -334,6 +454,13 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
         toAgent={pendingAgent ?? selectedAgent}
         messageCount={localMessages.length}
         onConfirm={handleSwitchConfirm}
+      />
+
+      <CreateBranchDialog
+        open={showCreateBranchDialog}
+        onOpenChange={setShowCreateBranchDialog}
+        onConfirm={handleConfirmCreateBranch}
+        parentBranchName={currentBranch?.name}
       />
     </div>
   );
