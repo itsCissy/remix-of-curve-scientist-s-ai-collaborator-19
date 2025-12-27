@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
-import { Clock, RefreshCw, SquarePen, Smartphone, Search, X, Loader2 } from "lucide-react";
-import CurveLogo from "./CurveLogo";
+import { FolderKanban, RefreshCw, SquarePen, PanelLeftClose, PanelLeft, Search, X, Loader2 } from "lucide-react";
 import ProjectItem from "./ProjectItem";
 import UserAvatar from "./UserAvatar";
 import NewProjectDialog from "./NewProjectDialog";
@@ -96,69 +95,75 @@ const Sidebar = ({
     await onSelectProject(project.id);
   };
 
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   return (
     <>
-      <div className="w-[280px] h-screen bg-card border-r border-curve-sidebar-border flex flex-col">
-        {/* Header */}
-        <div className="p-4 flex items-center justify-between">
-          <CurveLogo />
-          <button className="p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground">
-            <Smartphone className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* New Project Button */}
-        <div className="px-3 mb-2">
+      <div className={`${isCollapsed ? 'w-[60px]' : 'w-[280px]'} h-screen bg-card border-r border-curve-sidebar-border flex flex-col transition-all duration-200`}>
+        {/* Header with New Project Button and Collapse Toggle */}
+        <div className="p-3 flex items-center gap-2">
           <button 
             onClick={() => setNewProjectOpen(true)}
-            className="w-full flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 font-medium text-sm shadow-sm"
+            className={`flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 font-medium text-sm shadow-sm ${isCollapsed ? 'w-full justify-center' : 'flex-1'}`}
+            title="New Project"
           >
-            <SquarePen className="w-4 h-4" />
-            New Project
+            <SquarePen className="w-4 h-4 flex-shrink-0" />
+            {!isCollapsed && <span>New Project</span>}
+          </button>
+          <button 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground flex-shrink-0"
+            title={isCollapsed ? "展开侧边栏" : "折叠侧边栏"}
+          >
+            {isCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
           </button>
         </div>
 
         {/* All Projects Section */}
-        <div className="px-3 py-2">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4" />
-              <span>所有项目</span>
+        {!isCollapsed && (
+          <div className="px-3 py-2">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <div className="flex items-center gap-2 text-sm">
+                <FolderKanban className="w-4 h-4" />
+                <span>所有项目</span>
               {searchQuery && (
-                <span className="text-xs text-muted-foreground/70">
-                  ({filteredProjects.length}/{projects.length})
-                </span>
-              )}
+                  <span className="text-xs text-muted-foreground/70">
+                    ({filteredProjects.length}/{projects.length})
+                  </span>
+                )}
+              </div>
+              <button className="p-1 rounded hover:bg-curve-hover transition-colors">
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <button className="p-1 rounded hover:bg-curve-hover transition-colors">
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
           </div>
-        </div>
+        )}
 
         {/* Search Input */}
-        <div className="px-3 mb-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索项目名称或作者..."
-              className="pl-8 pr-8 h-8 text-sm bg-background/50"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted transition-colors"
-              >
-                <X className="w-3.5 h-3.5 text-muted-foreground" />
-              </button>
-            )}
+        {!isCollapsed && (
+          <div className="px-3 mb-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜索项目名称或作者..."
+                className="pl-8 pr-8 h-8 text-sm bg-background/50"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Project List */}
-        <div className="flex-1 overflow-y-auto px-2 scrollbar-thin">
+        <div className={`flex-1 overflow-y-auto scrollbar-thin ${isCollapsed ? 'px-1' : 'px-2'}`}>
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
@@ -196,8 +201,8 @@ const Sidebar = ({
         </div>
 
         {/* User Section */}
-        <div className="p-3 border-t border-curve-sidebar-border">
-          <UserAvatar name="程希希" />
+        <div className={`p-3 border-t border-curve-sidebar-border ${isCollapsed ? 'flex justify-center' : ''}`}>
+          <UserAvatar name="程希希" isCollapsed={isCollapsed} />
         </div>
       </div>
 
