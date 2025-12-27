@@ -11,103 +11,140 @@ interface MoleculeEditorDialogProps {
 
 declare global {
   interface Window {
-    JSApplet?: {
-      setCallBack: (event: string, callback: (event: unknown) => void) => void;
-      smiles: () => string;
-      molFile: () => string;
-      reset: () => void;
-      readMolecule: (molString: string) => void;
-    };
+    JSApplet?: any;
     jsmeOnLoad?: () => void;
   }
 }
 
+const CONTAINER_ID = "jsme-container-" + Math.random().toString(36).substr(2, 9);
+
 const MoleculeEditorDialog = ({ open, onOpenChange, onExport }: MoleculeEditorDialogProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentSmiles, setCurrentSmiles] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const jsmeRef = useRef<Window["JSApplet"] | null>(null);
+  const [editorReady, setEditorReady] = useState(false);
+  const jsmeRef = useRef<any>(null);
   const scriptLoadedRef = useRef(false);
+  const initAttemptRef = useRef(0);
 
   const initJSME = useCallback(() => {
-    if (!containerRef.current) return;
-    
-    // Clear container
-    containerRef.current.innerHTML = "";
-    
-    // Create JSME applet
-    const jsmeApplet = new (window as any).JSApplet.JSME(
-      containerRef.current,
-      "100%",
-      "100%",
-      {
-        options: "query,hydrogens,stereo,paste,reaction,multipart"
+    const container = document.getElementById(CONTAINER_ID);
+    if (!container) {
+      console.log("Container not found, retrying...");
+      initAttemptRef.current++;
+      if (initAttemptRef.current < 10) {
+        setTimeout(initJSME, 300);
       }
-    );
-    
-    jsmeRef.current = jsmeApplet;
-    
-    // Set callback for structure changes
-    jsmeApplet.setCallBack("AfterStructureModified", () => {
-      const smiles = jsmeApplet.smiles();
-      setCurrentSmiles(smiles || "");
-    });
-    
-    setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Check if JSApplet is available
+      if (!(window as any).JSApplet?.JSME) {
+        console.log("JSME not ready, retrying...");
+        initAttemptRef.current++;
+        if (initAttemptRef.current < 20) {
+          setTimeout(initJSME, 500);
+        }
+        return;
+      }
+
+      // Clear any existing content
+      container.innerHTML = "";
+      
+      // Create JSME applet using the container ID
+      const jsmeApplet = new (window as any).JSApplet.JSME(
+        CONTAINER_ID,
+        "100%",
+        "100%",
+        {
+          options: "query,hydrogens,stereo,paste,multipart"
+        }
+      );
+      
+      jsmeRef.current = jsmeApplet;
+      
+      // Set callback for structure changes
+      jsmeApplet.setCallBack("AfterStructureModified", () => {
+        try {
+          const smiles = jsmeApplet.smiles();
+          setCurrentSmiles(smiles || "");
+        } catch (e) {
+          console.error("Error getting SMILES:", e);
+        }
+      });
+      
+      setIsLoading(false);
+      setEditorReady(true);
+      console.log("JSME initialized successfully");
+    } catch (error) {
+      console.error("Error initializing JSME:", error);
+      initAttemptRef.current++;
+      if (initAttemptRef.current < 10) {
+        setTimeout(initJSME, 500);
+      }
+    }
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setEditorReady(false);
+      return;
+    }
+
+    initAttemptRef.current = 0;
+    setIsLoading(true);
 
     // Load JSME script if not already loaded
-    if (!scriptLoadedRef.current && !(window as any).JSApplet) {
-      setIsLoading(true);
+    if (!scriptLoadedRef.current && !(window as any).JSApplet?.JSME) {
+      // Set up the global callback
+      (window as any).jsmeOnLoad = () => {
+        console.log("JSME script loaded");
+        scriptLoadedRef.current = true;
+        setTimeout(initJSME, 100);
+      };
       
       const script = document.createElement("script");
       script.src = "https://jsme-editor.github.io/dist/jsme/jsme.nocache.js";
       script.async = true;
       
-      script.onload = () => {
-        scriptLoadedRef.current = true;
-        // JSME takes a moment to initialize after script loads
-        setTimeout(initJSME, 500);
-      };
-      
       script.onerror = () => {
-        console.error("Failed to load JSME");
+        console.error("Failed to load JSME script");
         setIsLoading(false);
       };
       
       document.head.appendChild(script);
-    } else if ((window as any).JSApplet) {
+      
+      // Also try to init after a delay in case the callback doesn't fire
+      setTimeout(initJSME, 2000);
+    } else if ((window as any).JSApplet?.JSME) {
       // JSME already loaded, just initialize
       setTimeout(initJSME, 100);
     }
-    
-    return () => {
-      // Cleanup when dialog closes
-      if (!open && containerRef.current) {
-        containerRef.current.innerHTML = "";
-      }
-    };
   }, [open, initJSME]);
 
   const handleExport = () => {
     if (jsmeRef.current) {
-      const smiles = jsmeRef.current.smiles();
-      if (smiles && smiles.trim()) {
-        onExport(smiles);
-        onOpenChange(false);
-        // Reset editor
-        jsmeRef.current.reset();
-        setCurrentSmiles("");
+      try {
+        const smiles = jsmeRef.current.smiles();
+        if (smiles && smiles.trim()) {
+          onExport(smiles);
+          onOpenChange(false);
+          jsmeRef.current.reset();
+          setCurrentSmiles("");
+        }
+      } catch (e) {
+        console.error("Error exporting SMILES:", e);
       }
     }
   };
 
   const handleClose = () => {
     if (jsmeRef.current) {
-      jsmeRef.current.reset();
+      try {
+        jsmeRef.current.reset();
+      } catch (e) {
+        // Ignore reset errors
+      }
     }
     setCurrentSmiles("");
     onOpenChange(false);
@@ -129,9 +166,9 @@ const MoleculeEditorDialog = ({ open, onOpenChange, onExport }: MoleculeEditorDi
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 relative bg-white">
+        <div className="flex-1 relative bg-white overflow-hidden">
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+            <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="w-8 h-8 text-primary animate-spin" />
                 <p className="text-sm text-muted-foreground">Loading molecule editor...</p>
@@ -139,7 +176,7 @@ const MoleculeEditorDialog = ({ open, onOpenChange, onExport }: MoleculeEditorDi
             </div>
           )}
           <div 
-            ref={containerRef} 
+            id={CONTAINER_ID}
             className="w-full h-full"
             style={{ minHeight: "400px" }}
           />
