@@ -52,26 +52,13 @@ const ChatHeader = ({
               className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors font-medium"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>{projectName}</span>
+              <span>分支视图</span>
             </button>
           </TooltipTrigger>
           <TooltipContent>
             <p>查看分支视图</p>
           </TooltipContent>
         </Tooltip>
-
-        {/* Current branch indicator */}
-        {currentBranch && (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-accent rounded-md">
-            <GitBranch className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-medium">{currentBranch.name}</span>
-            {currentBranch.is_main && (
-              <span className="px-1 py-0.5 text-[10px] bg-primary/20 text-primary rounded">
-                主线
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Right side - Collaborators */}
