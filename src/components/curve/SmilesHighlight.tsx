@@ -1,7 +1,11 @@
-import { useState, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Copy, Check, Loader2, Download, FlaskConical, Scale } from "lucide-react";
+import { Copy, Check, Loader2, Download, FlaskConical, Scale, Pin, PinOff } from "lucide-react";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 interface SmilesHighlightProps {
   smiles: string;
@@ -78,77 +82,54 @@ const formatFormula = (formula: string): React.ReactNode => {
 };
 
 const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
-  const [showPopover, setShowPopover] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [moleculeInfo, setMoleculeInfo] = useState<MoleculeInfo | null>(null);
   const [infoLoading, setInfoLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
-  const triggerRef = useRef<HTMLSpanElement>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Fetch molecule info when popover opens
   useEffect(() => {
-    if (showPopover && !moleculeInfo && !infoLoading) {
+    if (isOpen && !moleculeInfo && !infoLoading) {
       setInfoLoading(true);
       fetchMoleculeInfo(smiles).then(info => {
         setMoleculeInfo(info);
         setInfoLoading(false);
       });
     }
-  }, [showPopover, smiles, moleculeInfo, infoLoading]);
+  }, [isOpen, smiles, moleculeInfo, infoLoading]);
 
-  const handleMouseEnter = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    
-    // Calculate position based on trigger element
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPopoverPosition({
-        top: rect.bottom + 4, // Reduced gap to prevent flicker
-        left: rect.left,
-      });
-    }
-    
-    if (!showPopover) {
-      setShowPopover(true);
+  // Reset image loading state when popover opens
+  useEffect(() => {
+    if (isOpen) {
       setImageLoading(true);
       setImageError(false);
     }
-  };
+  }, [isOpen]);
 
-  const handleMouseLeave = (e: React.MouseEvent) => {
-    // Don't close immediately - allow time to move to popover
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(() => {
-      setShowPopover(false);
-    }, 150);
-  };
+  const handleOpenChange = useCallback((open: boolean) => {
+    // If pinned, don't allow closing via hover
+    if (isPinned && !open) return;
+    setIsOpen(open);
+  }, [isPinned]);
 
-  const handlePopoverMouseEnter = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
+  const handlePin = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (isPinned) {
+      setIsPinned(false);
+      setIsOpen(false);
+    } else {
+      setIsPinned(true);
     }
-  };
-
-  const handlePopoverMouseLeave = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(() => {
-      setShowPopover(false);
-    }, 150);
-  };
+  }, [isPinned]);
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     try {
       await navigator.clipboard.writeText(smiles);
       setCopied(true);
@@ -160,6 +141,7 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     setDownloading(true);
     
     try {
@@ -181,86 +163,126 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
     }
   };
 
-  return (
-    <span className="inline-block">
-      <span
-        ref={triggerRef}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        className={cn(
-          "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md cursor-pointer transition-all duration-200",
-          "bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20",
-          "hover:bg-violet-500/20 hover:border-violet-500/40",
-          "font-mono text-sm",
-          className
-        )}
-      >
-        <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="8" cy="8" r="3" />
-          <circle cx="16" cy="8" r="3" />
-          <circle cx="12" cy="16" r="3" />
-          <line x1="10.5" y1="9.5" x2="13.5" y2="14.5" />
-          <line x1="13.5" y1="9.5" x2="10.5" y2="14.5" />
-        </svg>
-        <span className="truncate max-w-[200px]">{smiles}</span>
-        <button
-          onClick={handleCopy}
-          className="ml-0.5 p-0.5 rounded hover:bg-violet-500/20 transition-colors"
-          title="复制 SMILES"
-        >
-          {copied ? (
-            <Check className="w-3 h-3 text-emerald-500" />
-          ) : (
-            <Copy className="w-3 h-3" />
-          )}
-        </button>
-      </span>
+  // Close on escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && (isOpen || isPinned)) {
+        setIsPinned(false);
+        setIsOpen(false);
+      }
+    };
+    
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isPinned]);
 
-      {/* Molecule structure popover - using portal to escape overflow containers */}
-      {showPopover && popoverPosition && createPortal(
-        <div
-          onMouseEnter={handlePopoverMouseEnter}
-          onMouseLeave={handlePopoverMouseLeave}
-          style={{
-            position: 'fixed',
-            // Place wrapper starting at trigger bottom so the bridge fills the gap without overlapping the trigger.
-            top: popoverPosition.top - 4,
-            left: popoverPosition.left,
-            zIndex: 9999,
+  return (
+    <HoverCard 
+      open={isOpen} 
+      onOpenChange={handleOpenChange}
+      openDelay={200}
+      closeDelay={300}
+    >
+      <HoverCardTrigger asChild>
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            // Toggle pin on click
+            if (isOpen) {
+              setIsPinned(!isPinned);
+            } else {
+              setIsOpen(true);
+              setIsPinned(true);
+            }
           }}
+          className={cn(
+            "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md cursor-pointer transition-all duration-200",
+            "bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20",
+            "hover:bg-violet-500/20 hover:border-violet-500/40",
+            "font-mono text-sm",
+            isPinned && "ring-2 ring-violet-500/50 bg-violet-500/20",
+            className
+          )}
         >
-          {/* Invisible bridge to prevent flicker when moving from trigger to popover */}
-          <div className="h-1 w-full" />
-          <div
-            className={cn(
-              "bg-card border border-border rounded-lg shadow-xl",
-              "p-3 animate-fade-in",
-              "min-w-[280px] max-w-[320px]"
-            )}
+          <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="8" cy="8" r="3" />
+            <circle cx="16" cy="8" r="3" />
+            <circle cx="12" cy="16" r="3" />
+            <line x1="10.5" y1="9.5" x2="13.5" y2="14.5" />
+            <line x1="13.5" y1="9.5" x2="10.5" y2="14.5" />
+          </svg>
+          <span className="truncate max-w-[200px]">{smiles}</span>
+          <button
+            onClick={handleCopy}
+            className="ml-0.5 p-0.5 rounded hover:bg-violet-500/20 transition-colors"
+            title="复制 SMILES"
           >
+            {copied ? (
+              <Check className="w-3 h-3 text-emerald-500" />
+            ) : (
+              <Copy className="w-3 h-3" />
+            )}
+          </button>
+        </span>
+      </HoverCardTrigger>
+
+      <HoverCardContent 
+        className="w-auto min-w-[300px] max-w-[340px] p-0"
+        side="bottom"
+        align="start"
+        sideOffset={8}
+        collisionPadding={16}
+      >
+        <div className="p-3">
+          {/* Header with pin and download buttons */}
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-medium text-muted-foreground">
-              分子结构预览
+            <div className="flex items-center gap-2">
+              <div className="text-xs font-medium text-muted-foreground">
+                分子结构预览
+              </div>
+              {isPinned && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-600 dark:text-violet-400">
+                  已固定
+                </span>
+              )}
             </div>
-            <button
-              onClick={handleDownload}
-              disabled={downloading || imageError}
-              className={cn(
-                "p-1.5 rounded-md transition-colors",
-                "text-muted-foreground hover:text-foreground hover:bg-muted",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
-              title="下载分子图"
-            >
-              {downloading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handlePin}
+                className={cn(
+                  "p-1.5 rounded-md transition-colors",
+                  "text-muted-foreground hover:text-foreground hover:bg-muted",
+                  isPinned && "text-violet-600 dark:text-violet-400 bg-violet-500/10"
+                )}
+                title={isPinned ? "取消固定 (Esc)" : "固定浮层"}
+              >
+                {isPinned ? (
+                  <PinOff className="w-4 h-4" />
+                ) : (
+                  <Pin className="w-4 h-4" />
+                )}
+              </button>
+              <button
+                onClick={handleDownload}
+                disabled={downloading || imageError}
+                className={cn(
+                  "p-1.5 rounded-md transition-colors",
+                  "text-muted-foreground hover:text-foreground hover:bg-muted",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                )}
+                title="下载分子图"
+              >
+                {downloading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>
           
-          <div className="relative bg-white dark:bg-gray-100 rounded-md overflow-hidden aspect-square w-full max-w-[260px] mx-auto">
+          {/* Molecule image */}
+          <div className="relative bg-white dark:bg-gray-100 rounded-md overflow-hidden aspect-square w-full max-w-[280px] mx-auto">
             {imageLoading && !imageError && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
@@ -344,6 +366,7 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
                     href={`https://pubchem.ncbi.nlm.nih.gov/compound/${moleculeInfo.cid}`}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1 text-xs text-primary hover:underline px-2"
                   >
                     在 PubChem 中查看详情 →
@@ -353,14 +376,29 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
             ) : null}
           </div>
           
-          <div className="mt-2 text-xs text-muted-foreground font-mono break-all bg-muted/50 rounded px-2 py-1">
-            {smiles}
+          {/* SMILES string */}
+          <div className="mt-2 text-xs text-muted-foreground font-mono break-all bg-muted/50 rounded px-2 py-1.5 flex items-center gap-2">
+            <span className="flex-1 truncate">{smiles}</span>
+            <button
+              onClick={handleCopy}
+              className="p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
+              title="复制 SMILES"
+            >
+              {copied ? (
+                <Check className="w-3 h-3 text-emerald-500" />
+              ) : (
+                <Copy className="w-3 h-3" />
+              )}
+            </button>
           </div>
+
+          {/* Hint */}
+          <div className="mt-2 text-[10px] text-muted-foreground/70 text-center">
+            点击固定 · Esc 关闭
           </div>
-        </div>,
-        document.body
-      )}
-    </span>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 };
 
