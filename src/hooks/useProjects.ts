@@ -41,11 +41,19 @@ export const useProjects = () => {
 
       if (error) throw error;
       
-      setProjects(data || []);
+      // Map data to ensure arrays are never null
+      const mappedData: Project[] = (data || []).map(p => ({
+        ...p,
+        selected_agents: p.selected_agents || [],
+        tags: p.tags || [],
+        is_active: p.is_active ?? false,
+      }));
+      
+      setProjects(mappedData);
       
       // Set active project
-      const active = data?.find(p => p.is_active);
-      setActiveProject(active || data?.[0] || null);
+      const active = mappedData.find(p => p.is_active);
+      setActiveProject(active || mappedData[0] || null);
     } catch (error) {
       console.error("Error fetching projects:", error);
       toast.error("加载项目失败");
