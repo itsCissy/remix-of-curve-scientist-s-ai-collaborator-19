@@ -36,7 +36,9 @@ const fetchMoleculeInfo = async (smiles: string): Promise<MoleculeInfo | null> =
     if (props) {
       return {
         formula: props.MolecularFormula,
-        molecularWeight: props.MolecularWeight,
+        molecularWeight: typeof props.MolecularWeight === 'string' 
+          ? parseFloat(props.MolecularWeight) 
+          : props.MolecularWeight,
         iupacName: props.IUPACName,
         cid: props.CID
       };
