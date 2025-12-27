@@ -52,58 +52,62 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
   const [messageCountByBranch, setMessageCountByBranch] = useState<Record<string, number>>({});
   const [messagesByBranch, setMessagesByBranch] = useState<Record<string, { content: string; role: string }[]>>({});
 
-  useEffect(() => {
-    const fetchMessageData = async () => {
-      if (!projectId || branches.length === 0) return;
-      
-      const counts: Record<string, number> = {};
-      const messagesData: Record<string, { content: string; role: string }[]> = {};
-      
-      for (const branch of branches) {
-        if (branch.is_main) {
-          // Main branch includes messages with null branch_id (legacy messages)
-          const { count } = await supabase
-            .from("messages")
-            .select("*", { count: "exact", head: true })
-            .eq("project_id", projectId)
-            .or(`branch_id.eq.${branch.id},branch_id.is.null`);
-          counts[branch.id] = count || 0;
-          
-          // Get messages for main branch
-          const { data: messages } = await supabase
-            .from("messages")
-            .select("content, role")
-            .eq("project_id", projectId)
-            .or(`branch_id.eq.${branch.id},branch_id.is.null`)
-            .order("created_at", { ascending: true })
-            .limit(10);
-          
-          messagesData[branch.id] = messages || [];
-        } else {
-          // Non-main branches only include their specific messages
-          const { count } = await supabase
-            .from("messages")
-            .select("*", { count: "exact", head: true })
-            .eq("branch_id", branch.id);
-          counts[branch.id] = count || 0;
-          
-          const { data: messages } = await supabase
-            .from("messages")
-            .select("content, role")
-            .eq("branch_id", branch.id)
-            .order("created_at", { ascending: true })
-            .limit(10);
-          
-          messagesData[branch.id] = messages || [];
-        }
-      }
-      
-      setMessageCountByBranch(counts);
-      setMessagesByBranch(messagesData);
-    };
+  // Fetch message data only when entering branch tree view, not on every message change
+  const fetchBranchMessageData = useCallback(async () => {
+    if (!projectId || branches.length === 0) return;
     
-    fetchMessageData();
-  }, [projectId, branches, dbMessages]);
+    const counts: Record<string, number> = {};
+    const messagesData: Record<string, { content: string; role: string }[]> = {};
+    
+    for (const branch of branches) {
+      if (branch.is_main) {
+        // Main branch includes messages with null branch_id (legacy messages)
+        const { count } = await supabase
+          .from("messages")
+          .select("*", { count: "exact", head: true })
+          .eq("project_id", projectId)
+          .or(`branch_id.eq.${branch.id},branch_id.is.null`);
+        counts[branch.id] = count || 0;
+        
+        // Get messages for main branch
+        const { data: messages } = await supabase
+          .from("messages")
+          .select("content, role")
+          .eq("project_id", projectId)
+          .or(`branch_id.eq.${branch.id},branch_id.is.null`)
+          .order("created_at", { ascending: true })
+          .limit(10);
+        
+        messagesData[branch.id] = messages || [];
+      } else {
+        // Non-main branches only include their specific messages
+        const { count } = await supabase
+          .from("messages")
+          .select("*", { count: "exact", head: true })
+          .eq("branch_id", branch.id);
+        counts[branch.id] = count || 0;
+        
+        const { data: messages } = await supabase
+          .from("messages")
+          .select("content, role")
+          .eq("branch_id", branch.id)
+          .order("created_at", { ascending: true })
+          .limit(10);
+        
+        messagesData[branch.id] = messages || [];
+      }
+    }
+    
+    setMessageCountByBranch(counts);
+    setMessagesByBranch(messagesData);
+  }, [projectId, branches]);
+
+  // Fetch branch data only when showing branch tree view
+  useEffect(() => {
+    if (showBranchTree) {
+      fetchBranchMessageData();
+    }
+  }, [showBranchTree, fetchBranchMessageData]);
 
   // Sync database messages to local state, filtered by current branch
   useEffect(() => {
