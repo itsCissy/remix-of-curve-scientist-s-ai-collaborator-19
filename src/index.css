@@ -144,4 +144,20 @@
   .animate-shimmer {
     animation: shimmer 1.5s infinite;
   }
+
+  /* Thinking bar animation */
+  @keyframes thinking-bar {
+    0%, 100% {
+      transform: translateX(-30%);
+      opacity: 0.7;
+    }
+    50% {
+      transform: translateX(30%);
+      opacity: 1;
+    }
+  }
+
+  .animate-thinking-bar {
+    animation: thinking-bar 2s ease-in-out infinite;
+  }
 }

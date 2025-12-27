@@ -1,6 +1,8 @@
 import { Brain, Wrench, CheckCircle, ChevronDown, Sparkles } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import MarkdownRenderer from "./MarkdownRenderer";
+import ThinkingLoader from "./ThinkingLoader";
 
 // Typewriter hook for character-by-character display
 const useTypewriter = (text: string, speed: number = 20, enabled: boolean = true) => {
@@ -237,8 +239,8 @@ const ConclusionSection = ({ content, enableTypewriter }: ConclusionSectionProps
           {isComplete ? "已完成" : "输出中..."}
         </span>
       </div>
-      <div className="px-4 py-3 text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-        {displayedText}
+      <div className="px-4 py-3 text-sm">
+        <MarkdownRenderer content={displayedText} />
         {!isComplete && (
           <span className="inline-block w-0.5 h-4 bg-emerald-500 ml-0.5 animate-pulse" />
         )}
@@ -303,14 +305,10 @@ const StructuredMessage = ({
     <div className="space-y-3">
       {/* Normal content before structured sections */}
       {normalContent && (
-        <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap animate-fade-in">
-          {isStreaming ? (
-            <>
-              {normalContent}
-              <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse" />
-            </>
-          ) : (
-            normalContent
+        <div className="text-sm animate-fade-in">
+          <MarkdownRenderer content={normalContent} />
+          {isStreaming && (
+            <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse" />
           )}
         </div>
       )}
@@ -339,22 +337,7 @@ const StructuredMessage = ({
 
       {/* Streaming indicator when no content yet */}
       {isStreaming && !normalContent && !hasStructuredContent && (
-        <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50 animate-fade-in">
-          <div className="relative">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <Brain className="w-4 h-4 text-primary animate-pulse" />
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-primary rounded-full animate-ping" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-foreground">正在分析...</span>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-              <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-            </div>
-          </div>
-        </div>
+        <ThinkingLoader />
       )}
     </div>
   );
