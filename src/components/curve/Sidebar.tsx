@@ -4,7 +4,8 @@ import CurveLogo from "./CurveLogo";
 import ProjectItem from "./ProjectItem";
 import UserAvatar from "./UserAvatar";
 import NewProjectDialog from "./NewProjectDialog";
-import ProjectContextMenu from "./ProjectContextMenu";
+import DeleteConfirmDialog from "./DeleteConfirmDialog";
+import RenameDialog from "./RenameDialog";
 import { toast } from "sonner";
 
 const projects = [
@@ -27,13 +28,32 @@ const projects = [
 
 const Sidebar = () => {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<{ name: string; index: number } | null>(null);
 
-  const handleRename = (projectName: string) => {
-    toast.info(`重命名项目: ${projectName}`);
+  const handleRename = (projectName: string, index: number) => {
+    setSelectedProject({ name: projectName, index });
+    setRenameDialogOpen(true);
   };
 
-  const handleDelete = (projectName: string) => {
-    toast.error(`删除项目: ${projectName}`);
+  const handleRenameConfirm = (newName: string) => {
+    toast.success(`项目已重命名为: ${newName}`);
+    setRenameDialogOpen(false);
+    setSelectedProject(null);
+  };
+
+  const handleDelete = (projectName: string, index: number) => {
+    setSelectedProject({ name: projectName, index });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (selectedProject) {
+      toast.success(`项目 "${selectedProject.name}" 已删除`);
+    }
+    setDeleteDialogOpen(false);
+    setSelectedProject(null);
   };
 
   const handleCopy = (projectName: string) => {
@@ -95,26 +115,20 @@ const Sidebar = () => {
         <div className="flex-1 overflow-y-auto px-2 scrollbar-thin">
           <div className="space-y-0.5">
             {projects.map((project, index) => (
-              <ProjectContextMenu
+              <ProjectItem
                 key={index}
-                projectName={project.name}
-                onRename={() => handleRename(project.name)}
-                onDelete={() => handleDelete(project.name)}
+                icon={project.icon}
+                name={project.name}
+                author={project.author}
+                isActive={project.isActive}
+                onRename={() => handleRename(project.name, index)}
+                onDelete={() => handleDelete(project.name, index)}
                 onCopy={() => handleCopy(project.name)}
                 onExport={() => handleExport(project.name)}
                 onShare={() => handleShare(project.name)}
                 onFavorite={() => handleFavorite(project.name)}
                 onOpen={() => handleOpen(project.name)}
-              >
-                <div>
-                  <ProjectItem
-                    icon={project.icon}
-                    name={project.name}
-                    author={project.author}
-                    isActive={project.isActive}
-                  />
-                </div>
-              </ProjectContextMenu>
+              />
             ))}
           </div>
         </div>
@@ -129,6 +143,22 @@ const Sidebar = () => {
       <NewProjectDialog 
         open={newProjectOpen} 
         onOpenChange={setNewProjectOpen} 
+      />
+
+      {/* Delete Confirm Dialog */}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        projectName={selectedProject?.name || ""}
+        onConfirm={handleDeleteConfirm}
+      />
+
+      {/* Rename Dialog */}
+      <RenameDialog
+        open={renameDialogOpen}
+        onOpenChange={setRenameDialogOpen}
+        currentName={selectedProject?.name || ""}
+        onConfirm={handleRenameConfirm}
       />
     </>
   );
