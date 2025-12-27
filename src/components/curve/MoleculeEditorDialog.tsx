@@ -381,7 +381,11 @@ const MoleculeEditorDialog = ({ open, onOpenChange, onExport, initialSmiles }: M
           {/* Properties Panel */}
           {showProperties && (
             <div className="w-[320px] border-l border-border bg-muted/20 p-3 overflow-hidden flex-shrink-0">
-              <MoleculePropertiesPanel smiles={currentSmiles} className="h-full" />
+              <MoleculePropertiesPanel 
+                smiles={currentSmiles} 
+                className="h-full" 
+                onLoadSmiles={loadMolecule}
+              />
             </div>
           )}
         </div>
