@@ -1,6 +1,40 @@
-import { Brain, Wrench, CheckCircle, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Brain, Wrench, CheckCircle, ChevronDown, Sparkles } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
+
+// Typewriter hook for character-by-character display
+const useTypewriter = (text: string, speed: number = 20, enabled: boolean = true) => {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) {
+      setDisplayedText(text);
+      setIsComplete(true);
+      return;
+    }
+
+    setDisplayedText("");
+    setIsComplete(false);
+    
+    if (!text) return;
+
+    let index = 0;
+    const timer = setInterval(() => {
+      if (index < text.length) {
+        setDisplayedText(text.slice(0, index + 1));
+        index++;
+      } else {
+        setIsComplete(true);
+        clearInterval(timer);
+      }
+    }, speed);
+
+    return () => clearInterval(timer);
+  }, [text, speed, enabled]);
+
+  return { displayedText, isComplete };
+};
 
 interface ReasoningSectionProps {
   content: string;
@@ -9,6 +43,19 @@ interface ReasoningSectionProps {
 
 const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [progress, setProgress] = useState(0);
+
+  // Simulate progress based on content length and streaming state
+  useEffect(() => {
+    if (isStreaming) {
+      // Estimate progress based on typical response patterns
+      const estimatedTotal = 500; // Expected average chars
+      const currentProgress = Math.min((content.length / estimatedTotal) * 100, 95);
+      setProgress(currentProgress);
+    } else if (content) {
+      setProgress(100);
+    }
+  }, [content, isStreaming]);
 
   return (
     <div className={cn(
@@ -34,16 +81,22 @@ const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
           )}
         </div>
         <span className="text-sm font-medium text-foreground">推理过程</span>
+        
+        {/* Progress indicator */}
         {isStreaming && (
-          <span className="ml-2 flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 rounded-full">
-            <span className="flex gap-0.5">
-              <span className="w-1 h-1 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-1 h-1 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: "100ms" }} />
-              <span className="w-1 h-1 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: "200ms" }} />
+          <span className="ml-2 flex items-center gap-2 px-2 py-0.5 bg-amber-500/10 rounded-full">
+            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+              {Math.round(progress)}%
             </span>
-            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">思考中</span>
           </span>
         )}
+        
+        {!isStreaming && content && (
+          <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+            完成
+          </span>
+        )}
+        
         <div className="ml-auto">
           <div className={cn(
             "transition-transform duration-200",
@@ -53,6 +106,21 @@ const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
           </div>
         </div>
       </button>
+      
+      {/* Progress bar */}
+      {isStreaming && (
+        <div className="px-4 pb-2">
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${progress}%` }}
+            >
+              <div className="h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className={cn(
         "grid transition-all duration-300 ease-out",
         isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
@@ -84,7 +152,6 @@ const ToolsSection = ({ tools, isNew }: ToolsSectionProps) => {
 
   useEffect(() => {
     if (isNew) {
-      // Animate tools appearing one by one
       const timer = setInterval(() => {
         setVisibleTools(prev => {
           if (prev >= tools.length) {
@@ -152,9 +219,12 @@ const ToolsSection = ({ tools, isNew }: ToolsSectionProps) => {
 
 interface ConclusionSectionProps {
   content: string;
+  enableTypewriter?: boolean;
 }
 
-const ConclusionSection = ({ content }: ConclusionSectionProps) => {
+const ConclusionSection = ({ content, enableTypewriter }: ConclusionSectionProps) => {
+  const { displayedText, isComplete } = useTypewriter(content, 15, enableTypewriter);
+
   return (
     <div className="bg-emerald-500/5 rounded-lg border border-emerald-500/20 overflow-hidden animate-scale-in shadow-[0_0_20px_rgba(16,185,129,0.1)]">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-emerald-500/10 bg-emerald-500/5">
@@ -164,13 +234,35 @@ const ConclusionSection = ({ content }: ConclusionSectionProps) => {
         </div>
         <span className="text-sm font-medium text-foreground">分析结论</span>
         <span className="ml-auto text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-          已完成
+          {isComplete ? "已完成" : "输出中..."}
         </span>
       </div>
       <div className="px-4 py-3 text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-        {content}
+        {displayedText}
+        {!isComplete && (
+          <span className="inline-block w-0.5 h-4 bg-emerald-500 ml-0.5 animate-pulse" />
+        )}
       </div>
     </div>
+  );
+};
+
+interface TypewriterTextProps {
+  text: string;
+  speed?: number;
+  enabled?: boolean;
+}
+
+const TypewriterText = ({ text, speed = 20, enabled = true }: TypewriterTextProps) => {
+  const { displayedText, isComplete } = useTypewriter(text, speed, enabled);
+  
+  return (
+    <span>
+      {displayedText}
+      {!isComplete && enabled && (
+        <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse" />
+      )}
+    </span>
   );
 };
 
@@ -192,6 +284,7 @@ const StructuredMessage = ({
   const hasStructuredContent = reasoning || (tools && tools.length > 0) || conclusion;
   const [showTools, setShowTools] = useState(false);
   const [showConclusion, setShowConclusion] = useState(false);
+  const [conclusionKey, setConclusionKey] = useState(0);
 
   useEffect(() => {
     if (tools && tools.length > 0 && !showTools) {
@@ -202,6 +295,7 @@ const StructuredMessage = ({
   useEffect(() => {
     if (conclusion && !showConclusion) {
       setShowConclusion(true);
+      setConclusionKey(prev => prev + 1); // Reset typewriter on new conclusion
     }
   }, [conclusion, showConclusion]);
 
@@ -210,7 +304,14 @@ const StructuredMessage = ({
       {/* Normal content before structured sections */}
       {normalContent && (
         <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap animate-fade-in">
-          {normalContent}
+          {isStreaming ? (
+            <>
+              {normalContent}
+              <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse" />
+            </>
+          ) : (
+            normalContent
+          )}
         </div>
       )}
 
@@ -226,7 +327,13 @@ const StructuredMessage = ({
           {tools && tools.length > 0 && (
             <ToolsSection tools={tools} isNew={!showConclusion} />
           )}
-          {conclusion && <ConclusionSection content={conclusion} />}
+          {conclusion && (
+            <ConclusionSection 
+              key={conclusionKey}
+              content={conclusion} 
+              enableTypewriter={!isStreaming}
+            />
+          )}
         </div>
       )}
 
