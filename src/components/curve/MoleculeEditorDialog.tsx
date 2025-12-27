@@ -357,12 +357,9 @@ const MoleculeEditorDialog = ({ open, onOpenChange, onExport, initialSmiles }: M
         </div>
         
         {/* Main Content Area */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           {/* Editor Area */}
-          <div className={cn(
-            "relative bg-white overflow-hidden transition-all duration-300",
-            showProperties ? "flex-1" : "w-full"
-          )}>
+          <div className="relative bg-white overflow-hidden flex-1 min-w-0 transition-all duration-300">
             {isLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
                 <div className="flex flex-col items-center gap-3">
@@ -379,15 +376,18 @@ const MoleculeEditorDialog = ({ open, onOpenChange, onExport, initialSmiles }: M
           </div>
 
           {/* Properties Panel */}
-          {showProperties && (
-            <div className="w-[320px] border-l border-border bg-muted/20 p-3 overflow-hidden flex-shrink-0">
+          <div className={cn(
+            "border-l border-border bg-muted/20 p-3 overflow-hidden flex-shrink-0 transition-all duration-300",
+            showProperties ? "w-[320px] opacity-100" : "w-0 p-0 border-l-0 opacity-0"
+          )}>
+            {showProperties && (
               <MoleculePropertiesPanel 
                 smiles={currentSmiles} 
                 className="h-full" 
                 onLoadSmiles={loadMolecule}
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Footer with SMILES preview and actions */}
