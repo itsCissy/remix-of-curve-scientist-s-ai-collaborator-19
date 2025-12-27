@@ -1,13 +1,16 @@
 import { useState, KeyboardEvent } from "react";
-import { Eye, ChevronDown, Send, Loader2 } from "lucide-react";
-import AgentAvatar from "./AgentAvatar";
+import { Eye, Send, Loader2 } from "lucide-react";
+import AgentSelector from "./AgentSelector";
+import { Agent } from "@/lib/agents";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
   isLoading?: boolean;
+  selectedAgent: Agent;
+  onSelectAgent: (agent: Agent) => void;
 }
 
-const ChatInput = ({ onSend, isLoading }: ChatInputProps) => {
+const ChatInput = ({ onSend, isLoading, selectedAgent, onSelectAgent }: ChatInputProps) => {
   const [input, setInput] = useState("");
 
   const handleSend = () => {
@@ -55,11 +58,10 @@ const ChatInput = ({ onSend, isLoading }: ChatInputProps) => {
 
             <div className="flex items-center gap-2">
               {/* Agent Selector */}
-              <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-curve-hover transition-colors text-sm">
-                <AgentAvatar size="sm" />
-                <span className="text-foreground font-medium">Curve Agent</span>
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              </button>
+              <AgentSelector
+                selectedAgent={selectedAgent}
+                onSelectAgent={onSelectAgent}
+              />
 
               {/* Send Button */}
               <button
