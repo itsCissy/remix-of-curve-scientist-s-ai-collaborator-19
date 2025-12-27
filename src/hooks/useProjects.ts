@@ -197,6 +197,28 @@ export const useProjects = () => {
     fetchProjects();
   }, [fetchProjects]);
 
+  // Realtime subscription for projects
+  useEffect(() => {
+    const channel = supabase
+      .channel("projects-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "projects",
+        },
+        () => {
+          fetchProjects();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchProjects]);
+
   return {
     projects,
     isLoading,
@@ -298,7 +320,7 @@ export const useMessages = (projectId: string | null) => {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Set up realtime subscription
+  // Set up realtime subscription for all events (INSERT, UPDATE, DELETE)
   useEffect(() => {
     if (!projectId) return;
 
@@ -307,18 +329,25 @@ export const useMessages = (projectId: string | null) => {
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "messages",
           filter: `project_id=eq.${projectId}`,
         },
         (payload) => {
-          const newMessage = payload.new as Message;
-          setMessages(prev => {
-            // Avoid duplicates
-            if (prev.some(m => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
-          });
+          if (payload.eventType === "INSERT") {
+            const newMessage = payload.new as Message;
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMessage.id)) return prev;
+              return [...prev, newMessage];
+            });
+          } else if (payload.eventType === "DELETE") {
+            const deletedId = (payload.old as { id: string }).id;
+            setMessages(prev => prev.filter(m => m.id !== deletedId));
+          } else if (payload.eventType === "UPDATE") {
+            const updatedMessage = payload.new as Message;
+            setMessages(prev => prev.map(m => m.id === updatedMessage.id ? updatedMessage : m));
+          }
         }
       )
       .subscribe();
