@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import ChatHeader from "./ChatHeader";
 import UserMessage from "./UserMessage";
 import AgentMessage from "./AgentMessage";
-import ChatInput from "./ChatInput";
+import ChatInput, { UploadedFile } from "./ChatInput";
 import AgentSwitchDialog from "./AgentSwitchDialog";
 import { Message, parseMessageContent, generateId } from "@/lib/messageUtils";
 import { Agent, DEFAULT_AGENT } from "@/lib/agents";
@@ -59,14 +59,30 @@ const ChatArea = () => {
     setShowSwitchDialog(false);
   };
 
-  const handleSend = async (input: string) => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (input: string, files?: UploadedFile[]) => {
+    if ((!input.trim() && (!files || files.length === 0)) || isLoading) return;
+
+    // Build message content with file references
+    let messageContent = input.trim();
+    const attachments: { name: string; type: string; size: number; preview?: string }[] = [];
+    
+    if (files && files.length > 0) {
+      files.forEach((f) => {
+        attachments.push({
+          name: f.file.name,
+          type: f.file.type,
+          size: f.file.size,
+          preview: f.preview,
+        });
+      });
+    }
 
     const userMessage: Message = {
       id: generateId(),
       role: "user",
-      content: input.trim(),
+      content: messageContent,
       timestamp: new Date(),
+      attachments,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -237,7 +253,11 @@ const ChatArea = () => {
           ) : (
             messages.map((message) =>
               message.role === "user" ? (
-                <UserMessage key={message.id} content={message.content} />
+                <UserMessage 
+                  key={message.id} 
+                  content={message.content}
+                  attachments={message.attachments}
+                />
               ) : (
                 <AgentMessage
                   key={message.id}
