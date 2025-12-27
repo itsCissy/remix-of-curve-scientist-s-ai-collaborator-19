@@ -223,16 +223,20 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
           onMouseLeave={handlePopoverMouseLeave}
           style={{
             position: 'fixed',
-            top: popoverPosition.top,
+            top: popoverPosition.top - 8, // Include bridge area in positioning
             left: popoverPosition.left,
             zIndex: 9999,
           }}
-          className={cn(
-            "bg-card border border-border rounded-lg shadow-xl",
-            "p-3 animate-fade-in",
-            "min-w-[280px] max-w-[320px]"
-          )}
         >
+          {/* Invisible bridge to prevent flicker when moving from trigger to popover */}
+          <div className="h-2 w-full" />
+          <div
+            className={cn(
+              "bg-card border border-border rounded-lg shadow-xl",
+              "p-3 animate-fade-in",
+              "min-w-[280px] max-w-[320px]"
+            )}
+          >
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-medium text-muted-foreground">
               分子结构预览
@@ -350,6 +354,7 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
           
           <div className="mt-2 text-xs text-muted-foreground font-mono break-all bg-muted/50 rounded px-2 py-1">
             {smiles}
+          </div>
           </div>
         </div>,
         document.body
