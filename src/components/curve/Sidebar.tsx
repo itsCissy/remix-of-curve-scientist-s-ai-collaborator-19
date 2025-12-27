@@ -4,6 +4,8 @@ import CurveLogo from "./CurveLogo";
 import ProjectItem from "./ProjectItem";
 import UserAvatar from "./UserAvatar";
 import NewProjectDialog from "./NewProjectDialog";
+import ProjectContextMenu from "./ProjectContextMenu";
+import { toast } from "sonner";
 
 const projects = [
   { icon: "📋", name: "test", author: "程希希", isActive: true },
@@ -25,6 +27,34 @@ const projects = [
 
 const Sidebar = () => {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+
+  const handleRename = (projectName: string) => {
+    toast.info(`重命名项目: ${projectName}`);
+  };
+
+  const handleDelete = (projectName: string) => {
+    toast.error(`删除项目: ${projectName}`);
+  };
+
+  const handleCopy = (projectName: string) => {
+    toast.success(`已复制项目: ${projectName}`);
+  };
+
+  const handleExport = (projectName: string) => {
+    toast.info(`导出项目: ${projectName}`);
+  };
+
+  const handleShare = (projectName: string) => {
+    toast.info(`分享项目: ${projectName}`);
+  };
+
+  const handleFavorite = (projectName: string) => {
+    toast.success(`已添加到收藏: ${projectName}`);
+  };
+
+  const handleOpen = (projectName: string) => {
+    toast.info(`打开项目: ${projectName}`);
+  };
 
   return (
     <>
@@ -48,12 +78,12 @@ const Sidebar = () => {
           </button>
         </div>
 
-        {/* History Section */}
+        {/* All Projects Section */}
         <div className="px-3 py-2">
           <div className="flex items-center justify-between text-muted-foreground">
             <div className="flex items-center gap-2 text-sm">
               <Clock className="w-4 h-4" />
-              <span>History</span>
+              <span>所有项目</span>
             </div>
             <button className="p-1 rounded hover:bg-curve-hover transition-colors">
               <RefreshCw className="w-3.5 h-3.5" />
@@ -65,13 +95,26 @@ const Sidebar = () => {
         <div className="flex-1 overflow-y-auto px-2 scrollbar-thin">
           <div className="space-y-0.5">
             {projects.map((project, index) => (
-              <ProjectItem
+              <ProjectContextMenu
                 key={index}
-                icon={project.icon}
-                name={project.name}
-                author={project.author}
-                isActive={project.isActive}
-              />
+                projectName={project.name}
+                onRename={() => handleRename(project.name)}
+                onDelete={() => handleDelete(project.name)}
+                onCopy={() => handleCopy(project.name)}
+                onExport={() => handleExport(project.name)}
+                onShare={() => handleShare(project.name)}
+                onFavorite={() => handleFavorite(project.name)}
+                onOpen={() => handleOpen(project.name)}
+              >
+                <div>
+                  <ProjectItem
+                    icon={project.icon}
+                    name={project.name}
+                    author={project.author}
+                    isActive={project.isActive}
+                  />
+                </div>
+              </ProjectContextMenu>
             ))}
           </div>
         </div>
