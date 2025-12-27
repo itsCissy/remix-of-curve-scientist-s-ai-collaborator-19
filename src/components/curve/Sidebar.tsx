@@ -116,7 +116,7 @@ const Sidebar = ({
           {isCollapsed ? (
             <button 
               onClick={() => setNewProjectOpen(true)}
-              className="w-9 h-9 flex items-center justify-center bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 shadow-sm"
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-all duration-200"
               title="New Project"
             >
               <SquarePen className="w-4 h-4" />
