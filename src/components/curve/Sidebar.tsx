@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { FolderKanban, RefreshCw, SquarePen, PanelLeftClose, PanelLeft, Search, X, Loader2 } from "lucide-react";
 import ProjectItem from "./ProjectItem";
-import UserAvatar from "./UserAvatar";
 import NewProjectDialog from "./NewProjectDialog";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
 import RenameDialog from "./RenameDialog";
@@ -101,18 +100,29 @@ const Sidebar = ({
     <>
       <div className={`${isCollapsed ? 'w-[60px]' : 'w-[280px]'} h-screen bg-card border-r border-curve-sidebar-border flex flex-col transition-all duration-200`}>
         {/* Header with New Project Button and Collapse Toggle */}
-        <div className="p-3 flex items-center gap-2">
-          <button 
-            onClick={() => setNewProjectOpen(true)}
-            className={`flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 font-medium text-sm shadow-sm ${isCollapsed ? 'w-full justify-center' : 'flex-1'}`}
-            title="New Project"
-          >
-            <SquarePen className="w-4 h-4 flex-shrink-0" />
-            {!isCollapsed && <span>New Project</span>}
-          </button>
+        <div className={`p-3 flex items-center ${isCollapsed ? 'flex-col gap-2' : 'gap-2'}`}>
+          {!isCollapsed && (
+            <button 
+              onClick={() => setNewProjectOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 font-medium text-sm shadow-sm flex-1"
+              title="New Project"
+            >
+              <SquarePen className="w-4 h-4 flex-shrink-0" />
+              <span>New Project</span>
+            </button>
+          )}
+          {isCollapsed && (
+            <button 
+              onClick={() => setNewProjectOpen(true)}
+              className="w-full flex items-center justify-center p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 shadow-sm"
+              title="New Project"
+            >
+              <SquarePen className="w-4 h-4" />
+            </button>
+          )}
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground flex-shrink-0"
+            className={`p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground flex-shrink-0 ${isCollapsed ? 'w-full flex justify-center' : ''}`}
             title={isCollapsed ? "展开侧边栏" : "折叠侧边栏"}
           >
             {isCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
@@ -200,10 +210,6 @@ const Sidebar = ({
           )}
         </div>
 
-        {/* User Section */}
-        <div className={`p-3 border-t border-curve-sidebar-border ${isCollapsed ? 'flex justify-center' : ''}`}>
-          <UserAvatar name="程希希" isCollapsed={isCollapsed} />
-        </div>
       </div>
 
       {/* New Project Dialog */}
