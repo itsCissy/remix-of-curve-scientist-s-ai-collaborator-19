@@ -1,16 +1,77 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Copy, Check, Loader2 } from "lucide-react";
+import { Copy, Check, Loader2, Download, FlaskConical, Scale } from "lucide-react";
 
 interface SmilesHighlightProps {
   smiles: string;
   className?: string;
 }
 
+interface MoleculeInfo {
+  formula?: string;
+  molecularWeight?: number;
+  iupacName?: string;
+  cid?: number;
+}
+
 // 使用 PubChem API 获取分子结构图
-const getMoleculeImageUrl = (smiles: string) => {
+const getMoleculeImageUrl = (smiles: string, size: number = 300) => {
   const encodedSmiles = encodeURIComponent(smiles);
-  return `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodedSmiles}/PNG?image_size=300x300`;
+  return `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodedSmiles}/PNG?image_size=${size}x${size}`;
+};
+
+// 从 PubChem 获取分子信息
+const fetchMoleculeInfo = async (smiles: string): Promise<MoleculeInfo | null> => {
+  try {
+    const encodedSmiles = encodeURIComponent(smiles);
+    const response = await fetch(
+      `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodedSmiles}/property/MolecularFormula,MolecularWeight,IUPACName/JSON`
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const props = data?.PropertyTable?.Properties?.[0];
+    
+    if (props) {
+      return {
+        formula: props.MolecularFormula,
+        molecularWeight: props.MolecularWeight,
+        iupacName: props.IUPACName,
+        cid: props.CID
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error("Failed to fetch molecule info:", err);
+    return null;
+  }
+};
+
+// 格式化分子式，添加下标
+const formatFormula = (formula: string): React.ReactNode => {
+  const parts: React.ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+  
+  while (i < formula.length) {
+    const char = formula[i];
+    
+    // 检查是否是数字
+    if (/\d/.test(char)) {
+      let num = char;
+      while (i + 1 < formula.length && /\d/.test(formula[i + 1])) {
+        i++;
+        num += formula[i];
+      }
+      parts.push(<sub key={key++}>{num}</sub>);
+    } else {
+      parts.push(char);
+    }
+    i++;
+  }
+  
+  return <>{parts}</>;
 };
 
 const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
@@ -18,7 +79,20 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [moleculeInfo, setMoleculeInfo] = useState<MoleculeInfo | null>(null);
+  const [infoLoading, setInfoLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (showPopover && !moleculeInfo && !infoLoading) {
+      setInfoLoading(true);
+      fetchMoleculeInfo(smiles).then(info => {
+        setMoleculeInfo(info);
+        setInfoLoading(false);
+      });
+    }
+  }, [showPopover, smiles, moleculeInfo, infoLoading]);
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -30,7 +104,7 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
   const handleMouseLeave = () => {
     timeoutRef.current = setTimeout(() => {
       setShowPopover(false);
-    }, 200);
+    }, 300);
   };
 
   const handleCopy = async (e: React.MouseEvent) => {
@@ -41,6 +115,29 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy:", err);
+    }
+  };
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDownloading(true);
+    
+    try {
+      const response = await fetch(getMoleculeImageUrl(smiles, 500));
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `molecule_${smiles.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 20)}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download:", err);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -87,14 +184,32 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
             "absolute z-50 left-0 top-full mt-2",
             "bg-card border border-border rounded-lg shadow-xl",
             "p-3 animate-fade-in",
-            "min-w-[240px]"
+            "min-w-[280px] max-w-[320px]"
           )}
         >
-          <div className="text-xs font-medium text-muted-foreground mb-2">
-            分子结构预览
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-medium text-muted-foreground">
+              分子结构预览
+            </div>
+            <button
+              onClick={handleDownload}
+              disabled={downloading || imageError}
+              className={cn(
+                "p-1.5 rounded-md transition-colors",
+                "text-muted-foreground hover:text-foreground hover:bg-muted",
+                "disabled:opacity-50 disabled:cursor-not-allowed"
+              )}
+              title="下载分子图"
+            >
+              {downloading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+            </button>
           </div>
           
-          <div className="relative bg-white dark:bg-gray-100 rounded-md overflow-hidden aspect-square w-[220px]">
+          <div className="relative bg-white dark:bg-gray-100 rounded-md overflow-hidden aspect-square w-full max-w-[260px] mx-auto">
             {imageLoading && !imageError && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
@@ -129,6 +244,62 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
                 }}
               />
             )}
+          </div>
+
+          {/* Molecule Info Section */}
+          <div className="mt-3 space-y-2">
+            {infoLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>加载分子信息...</span>
+              </div>
+            ) : moleculeInfo ? (
+              <>
+                {/* Molecular Formula */}
+                {moleculeInfo.formula && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-blue-500/10 rounded-md">
+                    <FlaskConical className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span className="text-xs text-muted-foreground">分子式:</span>
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                      {formatFormula(moleculeInfo.formula)}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Molecular Weight */}
+                {moleculeInfo.molecularWeight && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-emerald-500/10 rounded-md">
+                    <Scale className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                    <span className="text-xs text-muted-foreground">分子量:</span>
+                    <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                      {moleculeInfo.molecularWeight.toFixed(2)} g/mol
+                    </span>
+                  </div>
+                )}
+                
+                {/* IUPAC Name */}
+                {moleculeInfo.iupacName && (
+                  <div className="px-2 py-1.5 bg-amber-500/10 rounded-md">
+                    <div className="text-xs text-muted-foreground mb-0.5">IUPAC名称:</div>
+                    <div className="text-xs font-medium text-amber-600 dark:text-amber-400 break-words">
+                      {moleculeInfo.iupacName}
+                    </div>
+                  </div>
+                )}
+
+                {/* PubChem Link */}
+                {moleculeInfo.cid && (
+                  <a
+                    href={`https://pubchem.ncbi.nlm.nih.gov/compound/${moleculeInfo.cid}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-primary hover:underline px-2"
+                  >
+                    在 PubChem 中查看详情 →
+                  </a>
+                )}
+              </>
+            ) : null}
           </div>
           
           <div className="mt-2 text-xs text-muted-foreground font-mono break-all bg-muted/50 rounded px-2 py-1">
