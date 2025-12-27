@@ -13,6 +13,7 @@ interface ProjectItemProps {
   name: string;
   author: string;
   isActive?: boolean;
+  isCollapsed?: boolean;
   onRename?: () => void;
   onDelete?: () => void;
   onCopy?: () => void;
@@ -27,6 +28,7 @@ const ProjectItem = ({
   name, 
   author, 
   isActive = false,
+  isCollapsed = false,
   onRename,
   onDelete,
   onCopy,
@@ -37,6 +39,23 @@ const ProjectItem = ({
 }: ProjectItemProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Collapsed view - just show icon
+  if (isCollapsed) {
+    return (
+      <div
+        className={`w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 mx-auto ${
+          isActive
+            ? "bg-primary/10 text-foreground"
+            : "hover:bg-curve-hover text-muted-foreground hover:text-foreground"
+        }`}
+        onClick={onOpen}
+        title={name}
+      >
+        <span className="text-base">{icon}</span>
+      </div>
+    );
+  }
 
   return (
     <div

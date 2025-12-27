@@ -98,35 +98,48 @@ const Sidebar = ({
 
   return (
     <>
-      <div className={`${isCollapsed ? 'w-[60px]' : 'w-[280px]'} h-screen bg-card border-r border-curve-sidebar-border flex flex-col transition-all duration-200`}>
-        {/* Header with New Project Button and Collapse Toggle */}
-        <div className={`p-3 flex items-center ${isCollapsed ? 'flex-col gap-2' : 'gap-2'}`}>
-          {!isCollapsed && (
-            <button 
-              onClick={() => setNewProjectOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 font-medium text-sm shadow-sm flex-1"
-              title="New Project"
-            >
-              <SquarePen className="w-4 h-4 flex-shrink-0" />
-              <span>New Project</span>
-            </button>
-          )}
+      <div className={`${isCollapsed ? 'w-[52px]' : 'w-[280px]'} h-screen bg-card border-r border-curve-sidebar-border flex flex-col transition-all duration-200`}>
+        {/* Header - Collapse Toggle at top when collapsed */}
+        <div className={`p-2 flex ${isCollapsed ? 'flex-col items-center gap-1' : 'items-center gap-2 px-3'}`}>
+          {/* Collapse Toggle - Always first when collapsed */}
           {isCollapsed && (
             <button 
+              onClick={() => setIsCollapsed(false)}
+              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground"
+              title="展开侧边栏"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
+          )}
+          
+          {/* New Project Button */}
+          {isCollapsed ? (
+            <button 
               onClick={() => setNewProjectOpen(true)}
-              className="w-full flex items-center justify-center p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 shadow-sm"
+              className="w-9 h-9 flex items-center justify-center bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 shadow-sm"
               title="New Project"
             >
               <SquarePen className="w-4 h-4" />
             </button>
+          ) : (
+            <>
+              <button 
+                onClick={() => setNewProjectOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 font-medium text-sm shadow-sm flex-1"
+                title="New Project"
+              >
+                <SquarePen className="w-4 h-4 flex-shrink-0" />
+                <span>New Project</span>
+              </button>
+              <button 
+                onClick={() => setIsCollapsed(true)}
+                className="p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground flex-shrink-0"
+                title="折叠侧边栏"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+            </>
           )}
-          <button 
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className={`p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground flex-shrink-0 ${isCollapsed ? 'w-full flex justify-center' : ''}`}
-            title={isCollapsed ? "展开侧边栏" : "折叠侧边栏"}
-          >
-            {isCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-          </button>
         </div>
 
         {/* All Projects Section */}
@@ -173,13 +186,13 @@ const Sidebar = ({
         )}
 
         {/* Project List */}
-        <div className={`flex-1 overflow-y-auto scrollbar-thin ${isCollapsed ? 'px-1' : 'px-2'}`}>
+        <div className={`flex-1 overflow-y-auto scrollbar-thin ${isCollapsed ? 'px-1.5' : 'px-2'}`}>
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
             </div>
           ) : (
-            <div className="space-y-0.5">
+            <div className={`${isCollapsed ? 'space-y-1' : 'space-y-0.5'}`}>
               {filteredProjects.length > 0 ? (
                 filteredProjects.map((project) => (
                   <ProjectItem
@@ -188,6 +201,7 @@ const Sidebar = ({
                     name={project.name}
                     author={project.author}
                     isActive={project.id === activeProject?.id}
+                    isCollapsed={isCollapsed}
                     onRename={() => handleRename(project)}
                     onDelete={() => handleDelete(project)}
                     onCopy={() => handleCopy(project.name)}
@@ -198,13 +212,15 @@ const Sidebar = ({
                   />
                 ))
               ) : (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>{projects.length === 0 ? "暂无项目" : "未找到匹配的项目"}</p>
-                  <p className="text-xs mt-1">
-                    {projects.length === 0 ? "点击上方按钮创建新项目" : "尝试其他搜索关键词"}
-                  </p>
-                </div>
+                !isCollapsed && (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>{projects.length === 0 ? "暂无项目" : "未找到匹配的项目"}</p>
+                    <p className="text-xs mt-1">
+                      {projects.length === 0 ? "点击上方按钮创建新项目" : "尝试其他搜索关键词"}
+                    </p>
+                  </div>
+                )
               )}
             </div>
           )}
