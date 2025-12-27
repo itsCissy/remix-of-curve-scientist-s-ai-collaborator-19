@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Branch, Collaborator } from "@/hooks/useBranches";
-import { GitBranch, MessageSquare, Trash2, ArrowLeft, ZoomIn, ZoomOut, Maximize2, Plus, Clock, Sparkles } from "lucide-react";
+import { GitBranch, MessageSquare, Trash2, ArrowLeft, ZoomIn, ZoomOut, Maximize2, Plus, Clock, Sparkles, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -64,6 +74,10 @@ const BranchTreeView = ({
   const [parentBranchId, setParentBranchId] = useState<string | null>(null);
   const [newBranchName, setNewBranchName] = useState("");
   const [inheritContext, setInheritContext] = useState(true);
+
+  // Delete confirmation dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [branchToDelete, setBranchToDelete] = useState<BranchNode | null>(null);
 
   // Animation state for connection lines
   const [animationOffset, setAnimationOffset] = useState(0);
@@ -195,24 +209,41 @@ const BranchTreeView = ({
     setNewBranchName("");
   };
 
-  // Card dimensions
-  const CARD_WIDTH = 320;
-  const CARD_HEIGHT = 200;
-  const CARD_GAP_X = 140;
-  const CARD_GAP_Y = 60;
+  // Handle delete branch click
+  const handleDeleteBranchClick = (node: BranchNode, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setBranchToDelete(node);
+    setShowDeleteDialog(true);
+  };
 
-  // Render single branch card with glassmorphism
+  const handleConfirmDelete = () => {
+    if (branchToDelete) {
+      onDeleteBranch(branchToDelete.id);
+    }
+    setShowDeleteDialog(false);
+    setBranchToDelete(null);
+  };
+
+  // Card dimensions - increased for new layout
+  const CARD_WIDTH = 360;
+  const CARD_HEIGHT = 280;
+  const CARD_GAP_X = 160;
+  const CARD_GAP_Y = 80;
+
+  // Render single branch card with Header -> Content -> Action structure
   const renderCard = (node: BranchNode, x: number, y: number) => {
     const isSelected = node.id === currentBranchId;
     const isMainBranch = node.is_main;
+    const hasContent = (node.messageCount || 0) > 0;
 
     return (
       <div
         key={node.id}
         className={cn(
           "absolute group cursor-pointer transition-all duration-300 ease-out",
-          "rounded-2xl overflow-hidden",
-          "hover:-translate-y-2 hover:shadow-2xl",
+          "rounded-2xl overflow-hidden flex flex-col",
+          // Enhanced hover effects
+          "hover:-translate-y-3 hover:shadow-2xl hover:shadow-primary/10",
           // Glassmorphism effect
           "backdrop-blur-xl",
           isMainBranch 
@@ -236,9 +267,9 @@ const BranchTreeView = ({
             : "bg-gradient-to-br from-muted/30 via-transparent to-muted/10"
         )} />
         
-        {/* Card Header */}
+        {/* === HEADER === */}
         <div className={cn(
-          "relative flex items-center justify-between px-4 py-3",
+          "relative flex items-center justify-between px-4 py-3 shrink-0",
           isMainBranch 
             ? "border-b border-primary/20" 
             : "border-b border-border/30"
@@ -270,42 +301,91 @@ const BranchTreeView = ({
             </div>
           </div>
 
-          {/* Actions - visible on hover */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {!node.is_main && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteBranch(node.id);
-                    }}
-                    className="p-1.5 rounded-lg hover:bg-destructive/15 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive/70" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>删除分支</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
+          {/* Delete button - visible on hover (not for main branch) */}
+          {!node.is_main && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => handleDeleteBranchClick(node, e)}
+                  className={cn(
+                    "p-2 rounded-lg transition-all duration-200",
+                    "hover:bg-destructive/15 hover:scale-110",
+                    "opacity-0 group-hover:opacity-100"
+                  )}
+                >
+                  <Trash2 className="w-4 h-4 text-destructive/70 hover:text-destructive" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>删除分支</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
         
-        {/* Summary Content */}
-        <div className="relative px-4 py-3 flex-1">
-          <p className={cn(
-            "text-sm leading-relaxed line-clamp-3",
-            node.summary ? "text-foreground/80" : "text-muted-foreground/50 italic"
-          )}>
-            {node.summary || node.description || "暂无会话内容，双击进入开始对话"}
-          </p>
+        {/* === CONTENT === */}
+        <div className="relative px-4 py-3 flex-1 flex flex-col gap-3 overflow-hidden">
+          {/* Core Conclusion Summary */}
+          {hasContent ? (
+            <>
+              <div className="flex-1">
+                <p className="text-[11px] text-muted-foreground/70 uppercase tracking-wider font-medium mb-1.5">
+                  核心结论
+                </p>
+                <p className={cn(
+                  "text-sm leading-relaxed line-clamp-3",
+                  node.summary ? "text-foreground/80" : "text-muted-foreground/50 italic"
+                )}>
+                  {node.summary || "暂无结论摘要"}
+                </p>
+              </div>
+              
+              {/* Key Questions Preview */}
+              {node.questions && node.questions.length > 0 && (
+                <div className="shrink-0">
+                  <p className="text-[11px] text-muted-foreground/70 uppercase tracking-wider font-medium mb-2">
+                    关键问题
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {node.questions.slice(0, 3).map((question, idx) => (
+                      <span 
+                        key={idx}
+                        className={cn(
+                          "inline-flex items-center px-2.5 py-1 rounded-full text-xs",
+                          "bg-muted/50 text-muted-foreground border border-border/30",
+                          "max-w-[140px] truncate"
+                        )}
+                        title={question}
+                      >
+                        {question}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            // Empty state
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
+              <div className={cn(
+                "w-12 h-12 rounded-xl flex items-center justify-center mb-3",
+                "bg-muted/30 border border-border/30"
+              )}>
+                <MessageSquare className="w-6 h-6 text-muted-foreground/40" />
+              </div>
+              <p className="text-sm text-muted-foreground/60 italic">
+                暂无会话内容
+              </p>
+              <p className="text-xs text-muted-foreground/40 mt-1">
+                双击进入开始对话
+              </p>
+            </div>
+          )}
         </div>
         
-        {/* Footer */}
+        {/* === ACTION / FOOTER === */}
         <div className={cn(
-          "absolute bottom-0 left-0 right-0 flex items-center justify-between px-4 py-2.5",
+          "relative flex items-center justify-between px-4 py-2.5 shrink-0",
           "border-t",
           isMainBranch ? "border-primary/15 bg-primary/5" : "border-border/20 bg-muted/20"
         )}>
@@ -316,14 +396,14 @@ const BranchTreeView = ({
             </div>
             <div className="flex items-center gap-1.5">
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>{node.messageCount || 0}</span>
+              <span>{node.messageCount || 0} 条消息</span>
             </div>
           </div>
           
           {node.children.length > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">
               <GitBranch className="w-3 h-3" />
-              <span>{node.children.length}</span>
+              <span>{node.children.length} 个分支</span>
             </div>
           )}
         </div>
@@ -691,6 +771,47 @@ const BranchTreeView = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 rounded-full bg-destructive/10">
+                <AlertTriangle className="w-6 h-6 text-destructive" />
+              </div>
+              <AlertDialogTitle className="text-lg">确认删除此会话分支？</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-muted-foreground leading-relaxed">
+              此操作不可逆。删除该卡片将同步永久删除该分支内存储的所有会话历史记录及相关数据。
+              {branchToDelete && (
+                <span className="block mt-3 p-3 bg-muted/50 rounded-lg border border-border/50">
+                  <span className="text-foreground font-medium">分支名称：</span>
+                  <span className="text-foreground ml-1">{branchToDelete.name}</span>
+                  <span className="block text-xs text-muted-foreground mt-1">
+                    包含 {branchToDelete.messageCount || 0} 条消息
+                    {branchToDelete.children.length > 0 && (
+                      <span className="text-destructive/80 font-medium">
+                        ，以及 {branchToDelete.children.length} 个子分支
+                      </span>
+                    )}
+                  </span>
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="px-4">取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4 gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
