@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { Branch, Collaborator } from "@/hooks/useBranches";
-import { GitBranch, MessageSquare, Trash2, ArrowLeft, ChevronDown, ChevronRight, Sparkles, HelpCircle, ZoomIn, ZoomOut, Maximize2, GitMerge, Move } from "lucide-react";
+import { GitBranch, MessageSquare, Trash2, ArrowLeft, ZoomIn, ZoomOut, Maximize2, GitMerge, Move } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,8 +13,8 @@ import { Slider } from "@/components/ui/slider";
 interface BranchNode extends Branch {
   children: BranchNode[];
   messageCount?: number;
-  lastMessage?: string;
-  firstQuestion?: string;
+  summary?: string;
+  questions?: string[];
 }
 
 interface BranchTreeViewProps {
@@ -40,8 +40,6 @@ const BranchTreeView = ({
   messageCountByBranch = {},
   messagesByBranch = {},
 }: BranchTreeViewProps) => {
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(branches.map(b => b.id)));
-  
   // Canvas pan and zoom state
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -50,34 +48,34 @@ const BranchTreeView = ({
   const canvasRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Extract conclusion and question from messages - enhanced for main branch
-  const extractBranchSummary = useCallback((branchId: string, isMain: boolean): { conclusion: string; question: string } => {
+  // Extract summary and questions from messages
+  const extractBranchData = useCallback((branchId: string): { summary: string; questions: string[] } => {
     const messages = messagesByBranch[branchId] || [];
     
-    const firstUserMessage = messages.find(m => m.role === 'user');
-    // Main branch gets longer question preview
-    const questionMaxLen = isMain ? 120 : 80;
-    const question = firstUserMessage?.content?.slice(0, questionMaxLen) || '';
+    // Extract user questions (first 3)
+    const userMessages = messages.filter(m => m.role === 'user');
+    const questions = userMessages.slice(0, 3).map(m => {
+      const text = m.content?.slice(0, 50) || '';
+      return text.length >= 50 ? text + '...' : text;
+    });
     
+    // Extract summary from last assistant message
+    let summary = '';
     const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
-    let conclusion = '';
-    
-    // Main branch gets longer conclusion preview
-    const conclusionMaxLen = isMain ? 200 : 150;
     
     if (lastAssistantMessage?.content) {
       const conclusionMatch = lastAssistantMessage.content.match(/<conclusion>([\s\S]*?)<\/conclusion>/);
       if (conclusionMatch) {
-        conclusion = conclusionMatch[1].trim().slice(0, conclusionMaxLen);
+        summary = conclusionMatch[1].trim().slice(0, 300);
       } else {
-        conclusion = lastAssistantMessage.content
-          .replace(/<[^>]+>/g, '')
-          .split('\n')
-          .find(line => line.trim().length > 20)?.slice(0, conclusionMaxLen) || '';
+        // Extract first meaningful paragraph
+        const cleanContent = lastAssistantMessage.content.replace(/<[^>]+>/g, '');
+        const paragraphs = cleanContent.split('\n').filter(p => p.trim().length > 20);
+        summary = paragraphs.slice(0, 3).join(' ').slice(0, 300);
       }
     }
     
-    return { conclusion, question };
+    return { summary, questions };
   }, [messagesByBranch]);
 
   // Build tree structure
@@ -86,13 +84,13 @@ const BranchTreeView = ({
     const roots: BranchNode[] = [];
 
     branches.forEach((branch) => {
-      const summary = extractBranchSummary(branch.id, branch.is_main);
+      const data = extractBranchData(branch.id);
       nodeMap.set(branch.id, {
         ...branch,
         children: [],
         messageCount: messageCountByBranch[branch.id] || 0,
-        lastMessage: summary.conclusion,
-        firstQuestion: summary.question,
+        summary: data.summary,
+        questions: data.questions,
       });
     });
 
@@ -106,7 +104,7 @@ const BranchTreeView = ({
     });
 
     return roots;
-  }, [branches, messageCountByBranch, extractBranchSummary]);
+  }, [branches, messageCountByBranch, extractBranchData]);
 
   // Pan and zoom handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -144,19 +142,6 @@ const BranchTreeView = ({
     setPosition({ x: 0, y: 0 });
   };
 
-  const toggleExpand = (nodeId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setExpandedNodes((prev) => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
-      }
-      return next;
-    });
-  };
-
   const getCollaboratorName = (collaboratorId: string | null): string => {
     if (!collaboratorId) return "系统";
     const collab = collaborators.find((c) => c.id === collaboratorId);
@@ -169,123 +154,203 @@ const BranchTreeView = ({
     return collab?.avatar_color || "hsl(var(--muted-foreground))";
   };
 
-  const renderBranchCard = (node: BranchNode, depth: number = 0, isLast: boolean = true, parentLines: boolean[] = []): JSX.Element => {
-    const isExpanded = expandedNodes.has(node.id);
-    const hasChildren = node.children.length > 0;
-    const isSelected = node.id === currentBranchId;
-    const canMerge = !node.is_main && onMergeBranch;
+  // Card dimensions for layout
+  const CARD_WIDTH = 360;
+  const CARD_GAP_X = 120;
+  const CARD_GAP_Y = 60;
 
+  // Render curved connection line using SVG
+  const renderConnection = (
+    fromX: number, 
+    fromY: number, 
+    toX: number, 
+    toY: number, 
+    key: string
+  ) => {
+    // Control points for bezier curve
+    const midX = (fromX + toX) / 2;
+    
+    const path = `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`;
+    
     return (
-      <div key={node.id} className="relative">
-        {/* Connection lines from parent */}
-        {depth > 0 && (
-          <div className="absolute left-0 top-0 bottom-0 pointer-events-none">
-            {parentLines.map((showLine, index) => (
-              showLine && (
-                <div
-                  key={index}
-                  className="absolute w-0.5 bg-gradient-to-b from-primary/30 via-border to-border/50"
-                  style={{
-                    left: `${index * 300 + 150}px`,
-                    top: 0,
-                    bottom: 0,
-                  }}
-                />
-              )
-            ))}
+      <path
+        key={key}
+        d={path}
+        fill="none"
+        stroke="hsl(var(--border))"
+        strokeWidth="2"
+        className="transition-all duration-300"
+      />
+    );
+  };
+
+  // Calculate positions and render nodes
+  const renderBranchTree = () => {
+    if (buildTree.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground">
+          <div className="w-20 h-20 rounded-2xl bg-muted/50 flex items-center justify-center mb-4 shadow-lg">
+            <GitBranch className="w-10 h-10 opacity-40" />
           </div>
-        )}
+          <p className="font-medium text-lg">暂无分支</p>
+          <p className="text-sm mt-1">发送消息后将自动创建主线分支</p>
+        </div>
+      );
+    }
 
-        <div 
-          className="flex items-start"
-          style={{ marginLeft: depth * 300 }}
-        >
-          {/* Horizontal connector line */}
-          {depth > 0 && (
-            <div className="relative flex items-center" style={{ width: 50 }}>
-              {/* Vertical line segment */}
-              <div 
-                className="absolute w-0.5 bg-gradient-to-b from-primary/40 to-border"
-                style={{ 
-                  left: -150,
-                  top: isLast ? 0 : -24,
-                  height: isLast ? 56 : 80,
-                }}
-              />
-              {/* Horizontal line */}
-              <div 
-                className="absolute h-0.5 bg-gradient-to-r from-primary/40 to-border"
-                style={{ 
-                  left: -150,
-                  top: 56,
-                  width: 150,
-                }}
-              />
-              {/* Connection dot */}
-              <div 
-                className="absolute w-3 h-3 rounded-full bg-primary/60 border-2 border-background shadow-sm"
-                style={{ left: -6, top: 50 }}
-              />
-            </div>
+    // Calculate positions for each node
+    const positions = new Map<string, { x: number; y: number; height: number }>();
+    const connections: { fromId: string; toId: string }[] = [];
+    
+    let currentY = 0;
+    
+    const calculateNodeHeight = (node: BranchNode): number => {
+      // Base height for card header and summary
+      let height = 180;
+      // Add height for questions
+      if (node.questions && node.questions.length > 0) {
+        height += node.questions.length * 40 + 20;
+      }
+      return height;
+    };
+
+    const layoutNode = (node: BranchNode, depth: number, startY: number): number => {
+      const height = calculateNodeHeight(node);
+      const x = depth * (CARD_WIDTH + CARD_GAP_X);
+      
+      if (node.children.length === 0) {
+        positions.set(node.id, { x, y: startY, height });
+        return startY + height + CARD_GAP_Y;
+      }
+      
+      // Layout children first to calculate total height
+      let childY = startY;
+      node.children.forEach(child => {
+        connections.push({ fromId: node.id, toId: child.id });
+        childY = layoutNode(child, depth + 1, childY);
+      });
+      
+      // Center parent node vertically among children
+      const firstChild = positions.get(node.children[0].id);
+      const lastChild = positions.get(node.children[node.children.length - 1].id);
+      
+      if (firstChild && lastChild) {
+        const centerY = (firstChild.y + lastChild.y + lastChild.height) / 2 - height / 2;
+        positions.set(node.id, { x, y: Math.max(startY, centerY), height });
+      } else {
+        positions.set(node.id, { x, y: startY, height });
+      }
+      
+      return childY;
+    };
+
+    // Layout all root nodes
+    buildTree.forEach(root => {
+      currentY = layoutNode(root, 0, currentY);
+    });
+
+    // Generate SVG connections
+    const svgConnections: JSX.Element[] = [];
+    connections.forEach(({ fromId, toId }) => {
+      const fromPos = positions.get(fromId);
+      const toPos = positions.get(toId);
+      
+      if (fromPos && toPos) {
+        const fromX = fromPos.x + CARD_WIDTH;
+        const fromY = fromPos.y + fromPos.height / 2;
+        const toX = toPos.x;
+        const toY = toPos.y + toPos.height / 2;
+        
+        svgConnections.push(renderConnection(fromX, fromY, toX, toY, `${fromId}-${toId}`));
+      }
+    });
+
+    // Calculate SVG dimensions
+    let maxX = 0;
+    let maxY = 0;
+    positions.forEach(pos => {
+      maxX = Math.max(maxX, pos.x + CARD_WIDTH + 100);
+      maxY = Math.max(maxY, pos.y + pos.height + 100);
+    });
+
+    // Render cards
+    const renderCard = (node: BranchNode) => {
+      const pos = positions.get(node.id);
+      if (!pos) return null;
+      
+      const isSelected = node.id === currentBranchId;
+      const canMerge = !node.is_main && onMergeBranch;
+
+      return (
+        <div
+          key={node.id}
+          className={cn(
+            "absolute group cursor-pointer transition-all duration-200",
+            "bg-card border rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-1"
           )}
-
-          {/* Branch Card - Main branch gets wider card */}
-          <div
-            className={cn(
-              "group relative rounded-xl border-2 cursor-pointer transition-all duration-200",
-              "bg-card/95 backdrop-blur-sm hover:bg-accent/30 hover:border-primary/50 hover:shadow-xl hover:-translate-y-0.5",
-              isSelected 
-                ? "border-primary shadow-xl shadow-primary/15 bg-primary/5" 
-                : "border-border/60 shadow-md",
-              node.is_main 
-                ? "w-80 ring-2 ring-primary/30 border-primary/40" 
-                : "w-72"
-            )}
-            onClick={() => onSelectBranch(node.id)}
-          >
-            {/* Card Header */}
-            <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/50">
-              {hasChildren && (
-                <button
-                  onClick={(e) => toggleExpand(node.id, e)}
-                  className="p-1 -ml-1 hover:bg-accent rounded-md transition-colors"
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  )}
-                </button>
+          style={{
+            left: pos.x,
+            top: pos.y,
+            width: CARD_WIDTH,
+          }}
+          onClick={() => onSelectBranch(node.id)}
+        >
+          {/* Card Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-base text-foreground">{node.name}</span>
+              {node.is_main && (
+                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded">
+                  主线
+                </span>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-1">
+              {/* Merge button */}
+              {canMerge && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMergeBranch(node.id, node.summary);
+                      }}
+                      className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-primary/10 transition-all"
+                    >
+                      <GitMerge className="w-4 h-4 text-primary" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>合并到主线</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
               
-              <div
-                className={cn(
-                  "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center shadow-sm",
-                  node.is_main 
-                    ? "bg-gradient-to-br from-primary/30 to-primary/10 text-primary" 
-                    : "bg-gradient-to-br from-accent to-muted text-muted-foreground"
-                )}
-              >
-                <GitBranch className="w-4 h-4" />
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-sm truncate text-foreground">
-                    {node.name}
-                  </span>
-                  {node.is_main && (
-                    <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-medium bg-primary text-primary-foreground rounded-md shadow-sm">
-                      主线
-                    </span>
-                  )}
-                </div>
-              </div>
+              {/* Delete button */}
+              {!node.is_main && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteBranch(node.id);
+                      }}
+                      className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>删除分支</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
 
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div
-                    className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] text-white font-medium shadow-sm ring-2 ring-background"
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] text-white font-medium ml-1"
                     style={{ backgroundColor: getCollaboratorColor(node.created_by) }}
                   >
                     {getCollaboratorName(node.created_by).charAt(0)}
@@ -296,145 +361,80 @@ const BranchTreeView = ({
                 </TooltipContent>
               </Tooltip>
             </div>
-
-            {/* Card Content - Enhanced for main branch */}
-            <div className={cn(
-              "px-3 py-3 space-y-2.5",
-              node.is_main ? "min-h-[100px]" : "min-h-[60px]"
-            )}>
-              {/* Main branch shows conversation thread summary */}
-              {node.is_main && node.messageCount && node.messageCount > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 text-[10px] font-medium text-primary">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                    <span>会话主线</span>
+          </div>
+          
+          {/* Summary Content */}
+          <div className="px-4 py-3 border-b border-border/30">
+            {node.summary ? (
+              <p className="text-sm text-muted-foreground leading-relaxed line-clamp-6">
+                {node.summary}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground/50 italic">
+                暂无会话内容
+              </p>
+            )}
+          </div>
+          
+          {/* Questions List */}
+          {node.questions && node.questions.length > 0 && (
+            <div className="px-4 py-3 space-y-2">
+              {node.questions.map((question, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] text-muted-foreground font-medium">Q</span>
                   </div>
-                </div>
-              )}
-
-              {node.firstQuestion && (
-                <div className="flex items-start gap-2">
-                  <div className="w-5 h-5 rounded-md bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                    <HelpCircle className="w-3 h-3 text-blue-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-muted-foreground mb-0.5">提问</p>
-                    <p className={cn(
-                      "text-xs text-foreground/90",
-                      node.is_main ? "line-clamp-3" : "line-clamp-2"
-                    )}>
-                      {node.firstQuestion}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {node.lastMessage && (
-                <div className="flex items-start gap-2">
-                  <div className="w-5 h-5 rounded-md bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="w-3 h-3 text-amber-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-muted-foreground mb-0.5">结论</p>
-                    <p className={cn(
-                      "text-xs text-foreground/80",
-                      node.is_main ? "line-clamp-3" : "line-clamp-2"
-                    )}>
-                      {node.lastMessage}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {node.description && !node.firstQuestion && !node.lastMessage && (
-                <p className="text-xs text-muted-foreground line-clamp-2">
-                  {node.description}
-                </p>
-              )}
-
-              {!node.firstQuestion && !node.lastMessage && !node.description && (
-                <p className="text-xs text-muted-foreground/60 italic">
-                  暂无会话内容
-                </p>
-              )}
-            </div>
-
-            {/* Card Footer */}
-            <div className="flex items-center justify-between px-3 py-2 border-t border-border/50 bg-muted/30 rounded-b-xl">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>{node.messageCount} 条消息</span>
-              </div>
-
-              <div className="flex items-center gap-1">
-                {hasChildren && (
-                  <span className="text-[10px] text-muted-foreground bg-accent/80 px-1.5 py-0.5 rounded-md">
-                    {node.children.length} 子分支
+                  <span className="text-xs text-muted-foreground truncate">
+                    问题{idx + 1}：{question}
                   </span>
-                )}
-                
-                {/* Merge button */}
-                {canMerge && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onMergeBranch(node.id, node.lastMessage);
-                        }}
-                        className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-primary/10 transition-all"
-                      >
-                        <GitMerge className="w-3.5 h-3.5 text-primary" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <p>合并到主线</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-                
-                {/* Delete button */}
-                {!node.is_main && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteBranch(node.id);
-                        }}
-                        className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <p>删除分支</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
+                </div>
+              ))}
             </div>
-
-            {/* Selected indicator */}
-            {isSelected && (
-              <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-10 bg-primary rounded-r-full shadow-lg" />
+          )}
+          
+          {/* Footer */}
+          <div className="flex items-center justify-between px-4 py-2 bg-muted/30 rounded-b-xl">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>{node.messageCount} 条消息</span>
+            </div>
+            {node.children.length > 0 && (
+              <span className="text-[10px] text-muted-foreground bg-accent/80 px-1.5 py-0.5 rounded-md">
+                {node.children.length} 子分支
+              </span>
             )}
           </div>
+
+          {/* Selected indicator */}
+          {isSelected && (
+            <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-primary rounded-r-full shadow-lg" />
+          )}
         </div>
+      );
+    };
 
-        {/* Children */}
-        {hasChildren && isExpanded && (
-          <div className="mt-5 space-y-5">
-            {node.children.map((child, index) => 
-              renderBranchCard(
-                child, 
-                depth + 1, 
-                index === node.children.length - 1,
-                [...parentLines, index !== node.children.length - 1]
-              )
-            )}
-          </div>
-        )}
+    // Collect all nodes for rendering
+    const allNodes: BranchNode[] = [];
+    const collectNodes = (nodes: BranchNode[]) => {
+      nodes.forEach(node => {
+        allNodes.push(node);
+        collectNodes(node.children);
+      });
+    };
+    collectNodes(buildTree);
+
+    return (
+      <div className="relative" style={{ width: maxX, height: maxY }}>
+        {/* SVG layer for connections */}
+        <svg 
+          className="absolute inset-0 pointer-events-none" 
+          style={{ width: maxX, height: maxY }}
+        >
+          {svgConnections}
+        </svg>
+        
+        {/* Cards layer */}
+        {allNodes.map(renderCard)}
       </div>
     );
   };
@@ -515,15 +515,12 @@ const BranchTreeView = ({
         onWheel={handleWheel}
         data-canvas-bg
       >
-        {/* Grid background */}
+        {/* Dot grid background */}
         <div 
-          className="absolute inset-0 opacity-30"
+          className="absolute inset-0"
           style={{
-            backgroundImage: `
-              linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
-              linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px)
-            `,
-            backgroundSize: `${40 * scale}px ${40 * scale}px`,
+            backgroundImage: `radial-gradient(circle, hsl(var(--border)) 1px, transparent 1px)`,
+            backgroundSize: `${24 * scale}px ${24 * scale}px`,
             backgroundPosition: `${position.x}px ${position.y}px`,
           }}
         />
@@ -537,22 +534,8 @@ const BranchTreeView = ({
             transformOrigin: '0 0',
           }}
         >
-          <div className="p-8 min-w-max">
-            {buildTree.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground">
-                <div className="w-20 h-20 rounded-2xl bg-muted/50 flex items-center justify-center mb-4 shadow-lg">
-                  <GitBranch className="w-10 h-10 opacity-40" />
-                </div>
-                <p className="font-medium text-lg">暂无分支</p>
-                <p className="text-sm mt-1">发送消息后将自动创建主线分支</p>
-              </div>
-            ) : (
-              <div className="space-y-5">
-                {buildTree.map((node, index) => 
-                  renderBranchCard(node, 0, index === buildTree.length - 1, [])
-                )}
-              </div>
-            )}
+          <div className="p-8">
+            {renderBranchTree()}
           </div>
         </div>
 
@@ -560,42 +543,6 @@ const BranchTreeView = ({
         <div className="absolute bottom-4 left-4 flex items-center gap-2 text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border">
           <Move className="w-3.5 h-3.5" />
           <span>拖拽移动</span>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="px-4 py-3 border-t bg-card/80 backdrop-blur-sm">
-        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
-              <GitBranch className="w-3 h-3 text-primary" />
-            </div>
-            <span>主线分支</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-accent to-muted flex items-center justify-center">
-              <GitBranch className="w-3 h-3 text-muted-foreground" />
-            </div>
-            <span>分歧分支</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-md bg-blue-500/10 flex items-center justify-center">
-              <HelpCircle className="w-3 h-3 text-blue-500" />
-            </div>
-            <span>核心提问</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-md bg-amber-500/10 flex items-center justify-center">
-              <Sparkles className="w-3 h-3 text-amber-500" />
-            </div>
-            <span>核心结论</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-md bg-primary/10 flex items-center justify-center">
-              <GitMerge className="w-3 h-3 text-primary" />
-            </div>
-            <span>合并分支</span>
-          </div>
         </div>
       </div>
     </div>
