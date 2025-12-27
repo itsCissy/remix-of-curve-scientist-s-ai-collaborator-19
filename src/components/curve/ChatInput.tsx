@@ -1,8 +1,15 @@
 import { useState, KeyboardEvent, useRef, useCallback } from "react";
-import { Eye, Send, Loader2, Paperclip, Image, X, FileText, File } from "lucide-react";
+import { Eye, Send, Loader2, Paperclip, Image, X, FileText, File, Hexagon } from "lucide-react";
 import AgentSelector from "./AgentSelector";
 import { Agent } from "@/lib/agents";
 import { cn } from "@/lib/utils";
+import MoleculeEditorDialog from "./MoleculeEditorDialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export interface UploadedFile {
   id: string;
@@ -22,6 +29,7 @@ const ChatInput = ({ onSend, isLoading, selectedAgent, onSelectAgent }: ChatInpu
   const [input, setInput] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [showMoleculeEditor, setShowMoleculeEditor] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -240,6 +248,29 @@ const ChatInput = ({ onSend, isLoading, selectedAgent, onSelectAgent }: ChatInpu
                 <Paperclip className="w-5 h-5" />
               </button>
 
+              {/* Molecule structure editor button */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setShowMoleculeEditor(true)}
+                      className="p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-violet-500"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="8" cy="8" r="2.5" />
+                        <circle cx="16" cy="8" r="2.5" />
+                        <circle cx="12" cy="15" r="2.5" />
+                        <line x1="10" y1="9" x2="13" y2="13.5" />
+                        <line x1="14" y1="9" x2="11" y2="13.5" />
+                      </svg>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Structure</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               <button className="p-2 rounded-lg hover:bg-curve-hover transition-colors text-muted-foreground hover:text-foreground">
                 <Eye className="w-5 h-5" />
               </button>
@@ -268,6 +299,19 @@ const ChatInput = ({ onSend, isLoading, selectedAgent, onSelectAgent }: ChatInpu
           </div>
         </div>
       </div>
+
+      {/* Molecule Editor Dialog */}
+      <MoleculeEditorDialog
+        open={showMoleculeEditor}
+        onOpenChange={setShowMoleculeEditor}
+        onExport={(smiles) => {
+          // Insert SMILES into input
+          setInput((prev) => {
+            const prefix = prev.trim() ? prev + " " : "";
+            return prefix + "`" + smiles + "`";
+          });
+        }}
+      />
     </div>
   );
 };
