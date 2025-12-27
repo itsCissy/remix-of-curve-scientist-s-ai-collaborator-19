@@ -152,6 +152,80 @@ export const useBranches = (projectId: string | null) => {
     }
   };
 
+  // Merge a branch into the main branch
+  const mergeBranch = async (
+    sourceBranchId: string,
+    mergeType: "messages" | "summary",
+    summary?: string
+  ): Promise<boolean> => {
+    if (!projectId) return false;
+
+    const sourceBranch = branches.find((b) => b.id === sourceBranchId);
+    const mainBranch = branches.find((b) => b.is_main);
+
+    if (!sourceBranch || !mainBranch) {
+      toast.error("无法找到源分支或主线分支");
+      return false;
+    }
+
+    if (sourceBranch.is_main) {
+      toast.error("无法合并主线分支");
+      return false;
+    }
+
+    try {
+      if (mergeType === "messages") {
+        // Copy all messages from source branch to main branch
+        const { data: messages, error: fetchError } = await supabase
+          .from("messages")
+          .select("*")
+          .eq("branch_id", sourceBranchId)
+          .order("created_at", { ascending: true });
+
+        if (fetchError) throw fetchError;
+
+        if (messages && messages.length > 0) {
+          const messagesToInsert = messages.map((m) => ({
+            project_id: m.project_id,
+            role: m.role,
+            content: m.content,
+            agent_id: m.agent_id,
+            files: m.files,
+            branch_id: mainBranch.id,
+            collaborator_id: m.collaborator_id,
+          }));
+
+          const { error: insertError } = await supabase
+            .from("messages")
+            .insert(messagesToInsert);
+
+          if (insertError) throw insertError;
+        }
+      } else if (mergeType === "summary" && summary) {
+        // Add a summary message to the main branch
+        const summaryContent = `**[从分支 "${sourceBranch.name}" 合并的结论]**\n\n${summary}`;
+        
+        const { error: insertError } = await supabase
+          .from("messages")
+          .insert({
+            project_id: projectId,
+            role: "assistant",
+            content: summaryContent,
+            branch_id: mainBranch.id,
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      toast.success(`分支 "${sourceBranch.name}" 已合并到主线`);
+      return true;
+    } catch (error) {
+      console.error("Error merging branch:", error);
+      toast.error("合并分支失败");
+      return false;
+    }
+  };
+
   // Delete a branch (cannot delete main branch)
   const deleteBranch = async (branchId: string): Promise<boolean> => {
     const branch = branches.find((b) => b.id === branchId);
@@ -220,6 +294,7 @@ export const useBranches = (projectId: string | null) => {
     ensureMainBranch,
     createBranch,
     switchBranch,
+    mergeBranch,
     deleteBranch,
     refetch: fetchBranches,
   };

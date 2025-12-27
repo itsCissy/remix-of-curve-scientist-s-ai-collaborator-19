@@ -6,6 +6,7 @@ import ChatInput, { UploadedFile } from "./ChatInput";
 import AgentSwitchDialog from "./AgentSwitchDialog";
 import BranchTreeView from "./BranchTreeView";
 import CreateBranchDialog from "./CreateBranchDialog";
+import MergeBranchDialog from "./MergeBranchDialog";
 import { Message as LocalMessage, parseMessageContent, generateId } from "@/lib/messageUtils";
 import { Agent, DEFAULT_AGENT } from "@/lib/agents";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
     ensureMainBranch, 
     createBranch, 
     switchBranch,
+    mergeBranch,
     deleteBranch,
   } = useBranches(projectId);
   const { collaborator, allCollaborators, ensureCollaborator } = useCollaborator(projectId);
@@ -39,6 +41,9 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
   const [showSwitchDialog, setShowSwitchDialog] = useState(false);
   const [showBranchTree, setShowBranchTree] = useState(false);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
+  const [showMergeDialog, setShowMergeDialog] = useState(false);
+  const [mergeBranchId, setMergeBranchId] = useState<string | null>(null);
+  const [mergeBranchConclusion, setMergeBranchConclusion] = useState<string | undefined>(undefined);
   const [branchPointMessageId, setBranchPointMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -387,22 +392,59 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
     return allCollaborators.find((c) => c.id === collaboratorId) || null;
   };
 
+  // Handle merge branch request
+  const handleMergeBranch = (branchId: string, conclusion?: string) => {
+    setMergeBranchId(branchId);
+    setMergeBranchConclusion(conclusion);
+    setShowMergeDialog(true);
+  };
+
+  const handleConfirmMerge = async (mergeType: "messages" | "summary", summary?: string) => {
+    if (!mergeBranchId) return;
+    await mergeBranch(mergeBranchId, mergeType, summary);
+    setMergeBranchId(null);
+    setMergeBranchConclusion(undefined);
+  };
+
+  // Get the branch name for merge dialog
+  const getMergeBranchName = () => {
+    if (!mergeBranchId) return "";
+    const branch = branches.find(b => b.id === mergeBranchId);
+    return branch?.name || "";
+  };
+
+  const getMainBranchName = () => {
+    const mainBranch = branches.find(b => b.is_main);
+    return mainBranch?.name || "主线";
+  };
+
   // Show branch tree view
   if (showBranchTree) {
     return (
-      <BranchTreeView
-        branches={branches}
-        collaborators={allCollaborators}
-        currentBranchId={currentBranch?.id || null}
-        onSelectBranch={(branchId) => {
-          switchBranch(branchId);
-          setShowBranchTree(false);
-        }}
-        onDeleteBranch={deleteBranch}
-        onBack={() => setShowBranchTree(false)}
-        messageCountByBranch={messageCountByBranch}
-        messagesByBranch={messagesByBranch}
-      />
+      <>
+        <BranchTreeView
+          branches={branches}
+          collaborators={allCollaborators}
+          currentBranchId={currentBranch?.id || null}
+          onSelectBranch={(branchId) => {
+            switchBranch(branchId);
+            setShowBranchTree(false);
+          }}
+          onDeleteBranch={deleteBranch}
+          onMergeBranch={handleMergeBranch}
+          onBack={() => setShowBranchTree(false)}
+          messageCountByBranch={messageCountByBranch}
+          messagesByBranch={messagesByBranch}
+        />
+        <MergeBranchDialog
+          open={showMergeDialog}
+          onOpenChange={setShowMergeDialog}
+          sourceBranchName={getMergeBranchName()}
+          targetBranchName={getMainBranchName()}
+          sourceConclusion={mergeBranchConclusion}
+          onConfirm={handleConfirmMerge}
+        />
+      </>
     );
   }
 
