@@ -223,13 +223,14 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
           onMouseLeave={handlePopoverMouseLeave}
           style={{
             position: 'fixed',
-            top: popoverPosition.top - 8, // Include bridge area in positioning
+            // Place wrapper starting at trigger bottom so the bridge fills the gap without overlapping the trigger.
+            top: popoverPosition.top - 4,
             left: popoverPosition.left,
             zIndex: 9999,
           }}
         >
           {/* Invisible bridge to prevent flicker when moving from trigger to popover */}
-          <div className="h-2 w-full" />
+          <div className="h-1 w-full" />
           <div
             className={cn(
               "bg-card border border-border rounded-lg shadow-xl",
