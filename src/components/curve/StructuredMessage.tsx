@@ -1,4 +1,4 @@
-import { Brain, Wrench, CheckCircle, ChevronDown, Sparkles } from "lucide-react";
+import { Brain, Wrench, CheckCircle, ChevronDown, Sparkles, Copy, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -226,6 +226,17 @@ interface ConclusionSectionProps {
 
 const ConclusionSection = ({ content, enableTypewriter }: ConclusionSectionProps) => {
   const { displayedText, isComplete } = useTypewriter(content, 15, enableTypewriter);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   return (
     <div className="bg-emerald-500/5 rounded-lg border border-emerald-500/20 overflow-hidden animate-scale-in shadow-[0_0_20px_rgba(16,185,129,0.1)]">
@@ -235,9 +246,20 @@ const ConclusionSection = ({ content, enableTypewriter }: ConclusionSectionProps
           <Sparkles className="w-3 h-3 text-emerald-400 absolute -top-1 -right-1 animate-pulse" />
         </div>
         <span className="text-sm font-medium text-foreground">分析结论</span>
-        <span className="ml-auto text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+        <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
           {isComplete ? "已完成" : "输出中..."}
         </span>
+        <button
+          onClick={handleCopy}
+          className="ml-auto p-1.5 rounded-md hover:bg-emerald-500/10 transition-colors text-emerald-600 dark:text-emerald-400"
+          title="复制结论"
+        >
+          {copied ? (
+            <Check className="w-4 h-4" />
+          ) : (
+            <Copy className="w-4 h-4" />
+          )}
+        </button>
       </div>
       <div className="px-4 py-3 text-sm">
         <MarkdownRenderer content={displayedText} />
