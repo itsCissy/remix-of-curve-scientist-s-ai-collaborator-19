@@ -331,7 +331,7 @@ export const useCollaborator = (projectId: string | null) => {
 
     setIsLoading(true);
     try {
-      // Check if collaborator already exists
+      // Check if collaborator already exists for this browser
       const { data: existing, error: fetchError } = await supabase
         .from("collaborators")
         .select("*")
@@ -347,24 +347,9 @@ export const useCollaborator = (projectId: string | null) => {
         return typedData;
       }
 
-      // Create new collaborator
-      const { data: newCollab, error: insertError } = await supabase
-        .from("collaborators")
-        .insert({
-          project_id: projectId,
-          browser_id: browserId,
-          name: `用户 ${Math.floor(Math.random() * 1000)}`,
-          avatar_color: getRandomColor(),
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      const typedData = newCollab as Collaborator;
-      setCollaborator(typedData);
-      setAllCollaborators((prev) => [...prev, typedData]);
-      return typedData;
+      // Don't auto-create new collaborators - return null if not found
+      // Users need to be invited first
+      return null;
     } catch (error) {
       console.error("Error ensuring collaborator:", error);
       return null;
