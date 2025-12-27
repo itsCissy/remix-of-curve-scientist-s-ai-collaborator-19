@@ -17,6 +17,7 @@ import AgentAvatar from "./AgentAvatar";
 interface NewProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onProjectCreate?: (projectData: { name: string; icon: string; description: string }) => void;
 }
 
 interface UploadedFile {
@@ -62,7 +63,7 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 };
 
-const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) => {
+const NewProjectDialog = ({ open, onOpenChange, onProjectCreate }: NewProjectDialogProps) => {
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
   const [selectedIcon, setSelectedIcon] = useState("🔬");
@@ -77,7 +78,13 @@ const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCreate = () => {
-    console.log({ projectName, projectDescription, selectedIcon, contextPath, selectedAgents, tags, uploadedFiles, selectedTemplate });
+    if (projectName.trim()) {
+      onProjectCreate?.({
+        name: projectName.trim(),
+        icon: selectedIcon,
+        description: projectDescription,
+      });
+    }
     onOpenChange(false);
     resetForm();
   };
