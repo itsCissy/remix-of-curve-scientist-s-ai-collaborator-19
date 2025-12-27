@@ -31,6 +31,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
     switchBranch,
     mergeBranch,
     deleteBranch,
+    renameBranch,
   } = useBranches(projectId);
   const { collaborator, allCollaborators, ensureCollaborator } = useCollaborator(projectId);
   
@@ -488,6 +489,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
             setShowBranchTree(false);
           }}
           onDeleteBranch={deleteBranch}
+          onRenameBranch={renameBranch}
           onMergeBranch={handleMergeBranch}
           onBack={() => setShowBranchTree(false)}
           messageCountByBranch={messageCountByBranch}
