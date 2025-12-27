@@ -7,6 +7,7 @@ interface UserAvatarProps {
   name: string;
   size?: "sm" | "md" | "lg";
   showName?: boolean;
+  isCollapsed?: boolean;
 }
 
 const menuItems = [
@@ -17,7 +18,7 @@ const menuItems = [
   { id: "language", label: "语言切换", icon: Languages },
 ];
 
-const UserAvatar = ({ name, size = "md", showName = true }: UserAvatarProps) => {
+const UserAvatar = ({ name, size = "md", showName = true, isCollapsed = false }: UserAvatarProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ bottom: number; left: number } | null>(null);
 
@@ -57,13 +58,15 @@ const UserAvatar = ({ name, size = "md", showName = true }: UserAvatarProps) => 
             className="w-full h-full object-cover"
           />
         </div>
-        {showName && (
+        {showName && !isCollapsed && (
           <span className="text-sm text-foreground font-medium flex-1 text-left">{name}</span>
         )}
-        <ChevronUp className={cn(
-          "w-4 h-4 text-muted-foreground transition-transform",
-          menuOpen && "rotate-180"
-        )} />
+        {!isCollapsed && (
+          <ChevronUp className={cn(
+            "w-4 h-4 text-muted-foreground transition-transform",
+            menuOpen && "rotate-180"
+          )} />
+        )}
       </button>
 
       {/* Menu Portal */}
