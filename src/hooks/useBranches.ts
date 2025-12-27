@@ -81,10 +81,32 @@ export const useBranches = (projectId: string | null) => {
   const ensureMainBranch = async (): Promise<Branch | null> => {
     if (!projectId) return null;
 
-    const existing = branches.find((b) => b.is_main);
-    if (existing) return existing;
+    // First check local state
+    const localExisting = branches.find((b) => b.is_main);
+    if (localExisting) return localExisting;
 
     try {
+      // Always check database first to avoid race conditions
+      const { data: dbExisting, error: fetchError } = await supabase
+        .from("branches")
+        .select("*")
+        .eq("project_id", projectId)
+        .eq("is_main", true)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      if (dbExisting) {
+        const typedData = dbExisting as Branch;
+        setBranches((prev) => {
+          if (prev.find((b) => b.id === typedData.id)) return prev;
+          return [...prev, typedData];
+        });
+        setCurrentBranch(typedData);
+        return typedData;
+      }
+
+      // Only create if no main branch exists in database
       const { data, error } = await supabase
         .from("branches")
         .insert({
