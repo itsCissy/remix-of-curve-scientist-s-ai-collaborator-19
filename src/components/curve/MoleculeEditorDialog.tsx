@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Import, RotateCcw, ChevronDown, Copy, Check } from "lucide-react";
+import { Loader2, Import, RotateCcw, ChevronDown, Copy, Check, PanelRightOpen, PanelRightClose } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
+import MoleculePropertiesPanel from "./MoleculePropertiesPanel";
 
 interface MoleculeEditorDialogProps {
   open: boolean;
@@ -82,6 +83,7 @@ const MoleculeEditorDialog = ({ open, onOpenChange, onExport, initialSmiles }: M
   const [importSmiles, setImportSmiles] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showProperties, setShowProperties] = useState(true);
   const jsmeRef = useRef<any>(null);
   const scriptLoadedRef = useRef(false);
   const initAttemptRef = useRef(0);
@@ -330,23 +332,58 @@ const MoleculeEditorDialog = ({ open, onOpenChange, onExport, initialSmiles }: M
             <RotateCcw className="w-4 h-4" />
             清空
           </Button>
+
+          <div className="flex-1" />
+
+          {/* Toggle Properties Panel */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowProperties(!showProperties)}
+            className="gap-1"
+          >
+            {showProperties ? (
+              <>
+                <PanelRightClose className="w-4 h-4" />
+                隐藏属性
+              </>
+            ) : (
+              <>
+                <PanelRightOpen className="w-4 h-4" />
+                显示属性
+              </>
+            )}
+          </Button>
         </div>
         
-        {/* Editor Area */}
-        <div className="flex-1 relative bg-white overflow-hidden">
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
-                <p className="text-sm text-muted-foreground">Loading molecule editor...</p>
+        {/* Main Content Area */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Editor Area */}
+          <div className={cn(
+            "relative bg-white overflow-hidden transition-all duration-300",
+            showProperties ? "flex-1" : "w-full"
+          )}>
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+                  <p className="text-sm text-muted-foreground">Loading molecule editor...</p>
+                </div>
               </div>
+            )}
+            <div 
+              id={CONTAINER_ID}
+              className="w-full h-full"
+              style={{ minHeight: "400px" }}
+            />
+          </div>
+
+          {/* Properties Panel */}
+          {showProperties && (
+            <div className="w-[320px] border-l border-border bg-muted/20 p-3 overflow-hidden flex-shrink-0">
+              <MoleculePropertiesPanel smiles={currentSmiles} className="h-full" />
             </div>
           )}
-          <div 
-            id={CONTAINER_ID}
-            className="w-full h-full"
-            style={{ minHeight: "400px" }}
-          />
         </div>
 
         {/* Footer with SMILES preview and actions */}
