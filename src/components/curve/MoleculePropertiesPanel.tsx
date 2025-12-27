@@ -395,7 +395,7 @@ const SimilarCompoundsTab = ({
                 )}
                 {compound.molecularWeight && (
                   <p className="text-xs text-emerald-600 mt-1">
-                    MW: {compound.molecularWeight.toFixed(2)} g/mol
+                    MW: {Number(compound.molecularWeight).toFixed(2)} g/mol
                   </p>
                 )}
               </div>
