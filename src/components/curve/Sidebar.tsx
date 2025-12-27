@@ -9,7 +9,14 @@ import RenameDialog from "./RenameDialog";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 
-const projects = [
+interface Project {
+  icon: string;
+  name: string;
+  author: string;
+  isActive?: boolean;
+}
+
+const initialProjects: Project[] = [
   { icon: "📋", name: "test", author: "程希希", isActive: true },
   { icon: "📋", name: "Tool Test 251226", author: "xinos" },
   { icon: "📋", name: "HTE&VAST TEST_PY", author: "张佩宇" },
@@ -28,6 +35,7 @@ const projects = [
 ];
 
 const Sidebar = () => {
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
@@ -42,7 +50,24 @@ const Sidebar = () => {
         project.name.toLowerCase().includes(query) ||
         project.author.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, projects]);
+
+  const handleProjectCreate = (projectData: { name: string; icon: string; description: string }) => {
+    const newProject: Project = {
+      icon: projectData.icon,
+      name: projectData.name,
+      author: "程希希", // Current user
+      isActive: true,
+    };
+    
+    // Set all projects as inactive and add new one at the top
+    setProjects(prev => [
+      newProject,
+      ...prev.map(p => ({ ...p, isActive: false }))
+    ]);
+    
+    toast.success(`项目 "${projectData.name}" 创建成功`);
+  };
 
   const handleRename = (projectName: string, index: number) => {
     setSelectedProject({ name: projectName, index });
@@ -50,7 +75,14 @@ const Sidebar = () => {
   };
 
   const handleRenameConfirm = (newName: string) => {
-    toast.success(`项目已重命名为: ${newName}`);
+    if (selectedProject) {
+      setProjects(prev => 
+        prev.map((p, i) => 
+          i === selectedProject.index ? { ...p, name: newName } : p
+        )
+      );
+      toast.success(`项目已重命名为: ${newName}`);
+    }
     setRenameDialogOpen(false);
     setSelectedProject(null);
   };
@@ -62,6 +94,7 @@ const Sidebar = () => {
 
   const handleDeleteConfirm = () => {
     if (selectedProject) {
+      setProjects(prev => prev.filter((_, i) => i !== selectedProject.index));
       toast.success(`项目 "${selectedProject.name}" 已删除`);
     }
     setDeleteDialogOpen(false);
@@ -84,7 +117,10 @@ const Sidebar = () => {
     toast.success(`已添加到收藏: ${projectName}`);
   };
 
-  const handleOpen = (projectName: string) => {
+  const handleOpen = (projectName: string, index: number) => {
+    setProjects(prev => 
+      prev.map((p, i) => ({ ...p, isActive: i === index }))
+    );
     toast.info(`打开项目: ${projectName}`);
   };
 
@@ -155,7 +191,7 @@ const Sidebar = () => {
             {filteredProjects.length > 0 ? (
               filteredProjects.map((project, index) => (
                 <ProjectItem
-                  key={index}
+                  key={`${project.name}-${index}`}
                   icon={project.icon}
                   name={project.name}
                   author={project.author}
@@ -166,7 +202,7 @@ const Sidebar = () => {
                   onExport={() => handleExport(project.name)}
                   onShare={() => handleShare(project.name)}
                   onFavorite={() => handleFavorite(project.name)}
-                  onOpen={() => handleOpen(project.name)}
+                  onOpen={() => handleOpen(project.name, index)}
                 />
               ))
             ) : (
@@ -188,7 +224,8 @@ const Sidebar = () => {
       {/* New Project Dialog */}
       <NewProjectDialog 
         open={newProjectOpen} 
-        onOpenChange={setNewProjectOpen} 
+        onOpenChange={setNewProjectOpen}
+        onProjectCreate={handleProjectCreate}
       />
 
       {/* Delete Confirm Dialog */}
