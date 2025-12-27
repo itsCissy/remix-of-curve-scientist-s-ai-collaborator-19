@@ -87,11 +87,14 @@ export const useBranches = (projectId: string | null) => {
 
     try {
       // Always check database first to avoid race conditions
+      // (limit(1) ensures this won't error even if old data had duplicate main branches)
       const { data: dbExisting, error: fetchError } = await supabase
         .from("branches")
         .select("*")
         .eq("project_id", projectId)
         .eq("is_main", true)
+        .order("created_at", { ascending: true })
+        .limit(1)
         .maybeSingle();
 
       if (fetchError) throw fetchError;
@@ -123,7 +126,30 @@ export const useBranches = (projectId: string | null) => {
       setBranches((prev) => [...prev, typedData]);
       setCurrentBranch(typedData);
       return typedData;
-    } catch (error) {
+    } catch (error: any) {
+      // If two callers race, the DB unique index may reject the second insert.
+      // In that case, re-fetch and return the existing main branch.
+      if (error?.code === "23505") {
+        const { data: existing } = await supabase
+          .from("branches")
+          .select("*")
+          .eq("project_id", projectId)
+          .eq("is_main", true)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          const typed = existing as Branch;
+          setBranches((prev) => {
+            if (prev.find((b) => b.id === typed.id)) return prev;
+            return [...prev, typed];
+          });
+          setCurrentBranch(typed);
+          return typed;
+        }
+      }
+
       console.error("Error creating main branch:", error);
       return null;
     }
