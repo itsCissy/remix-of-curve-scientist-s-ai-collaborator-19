@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "./MarkdownRenderer";
 import ThinkingLoader from "./ThinkingLoader";
-
+import FileViewer, { FileAttachment } from "./FileViewer";
 // Typewriter hook for character-by-character display
 const useTypewriter = (text: string, speed: number = 20, enabled: boolean = true) => {
   const [displayedText, setDisplayedText] = useState("");
@@ -274,6 +274,7 @@ interface StructuredMessageProps {
   conclusion?: string;
   normalContent?: string;
   isStreaming?: boolean;
+  files?: FileAttachment[];
 }
 
 const StructuredMessage = ({
@@ -282,6 +283,7 @@ const StructuredMessage = ({
   conclusion,
   normalContent,
   isStreaming,
+  files,
 }: StructuredMessageProps) => {
   const hasStructuredContent = reasoning || (tools && tools.length > 0) || conclusion;
   const [showTools, setShowTools] = useState(false);
@@ -335,6 +337,11 @@ const StructuredMessage = ({
         </div>
       )}
 
+      {/* File attachments */}
+      {files && files.length > 0 && (
+        <FileViewer files={files} />
+      )}
+
       {/* Streaming indicator when no content yet */}
       {isStreaming && !normalContent && !hasStructuredContent && (
         <ThinkingLoader />
@@ -344,3 +351,4 @@ const StructuredMessage = ({
 };
 
 export default StructuredMessage;
+export type { FileAttachment };
