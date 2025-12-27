@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Branch, Collaborator } from "@/hooks/useBranches";
-import { GitBranch, MessageSquare, Trash2, ArrowLeft, ZoomIn, ZoomOut, Maximize2, Plus, Clock, Sparkles, AlertTriangle } from "lucide-react";
+import { GitBranch, MessageSquare, Trash2, ArrowLeft, ZoomIn, ZoomOut, Maximize2, Plus, Clock, Sparkles, AlertTriangle, MoreHorizontal, Pencil, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,9 +26,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 
 interface BranchNode extends Branch {
   children: BranchNode[];
@@ -43,6 +51,8 @@ interface BranchTreeViewProps {
   currentBranchId: string | null;
   onSelectBranch: (branchId: string) => void;
   onDeleteBranch: (branchId: string) => void;
+  onRenameBranch?: (branchId: string, newName: string) => void;
+  onCopyBranch?: (branchId: string) => void;
   onMergeBranch?: (branchId: string, conclusion?: string) => void;
   onBack: () => void;
   messageCountByBranch?: Record<string, number>;
@@ -56,6 +66,8 @@ const BranchTreeView = ({
   currentBranchId,
   onSelectBranch,
   onDeleteBranch,
+  onRenameBranch,
+  onCopyBranch,
   onMergeBranch,
   onBack,
   messageCountByBranch = {},
@@ -78,6 +90,11 @@ const BranchTreeView = ({
   // Delete confirmation dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState<BranchNode | null>(null);
+
+  // Rename dialog state
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [branchToRename, setBranchToRename] = useState<BranchNode | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   // Animation state for connection lines
   const [animationOffset, setAnimationOffset] = useState(0);
@@ -210,8 +227,7 @@ const BranchTreeView = ({
   };
 
   // Handle delete branch click
-  const handleDeleteBranchClick = (node: BranchNode, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteBranchClick = (node: BranchNode) => {
     setBranchToDelete(node);
     setShowDeleteDialog(true);
   };
@@ -222,6 +238,43 @@ const BranchTreeView = ({
     }
     setShowDeleteDialog(false);
     setBranchToDelete(null);
+  };
+
+  // Handle rename branch
+  const handleRenameBranchClick = (node: BranchNode) => {
+    setBranchToRename(node);
+    setRenameValue(node.name);
+    setShowRenameDialog(true);
+  };
+
+  const handleConfirmRename = () => {
+    if (branchToRename && renameValue.trim() && onRenameBranch) {
+      onRenameBranch(branchToRename.id, renameValue.trim());
+      toast({
+        title: "重命名成功",
+        description: `分支已重命名为"${renameValue.trim()}"`,
+      });
+    }
+    setShowRenameDialog(false);
+    setBranchToRename(null);
+    setRenameValue("");
+  };
+
+  // Handle copy branch
+  const handleCopyBranchClick = (node: BranchNode) => {
+    if (onCopyBranch) {
+      onCopyBranch(node.id);
+      toast({
+        title: "复制分支",
+        description: `已创建"${node.name}"的副本`,
+      });
+    } else {
+      toast({
+        title: "功能暂未开放",
+        description: "复制分支功能正在开发中",
+        variant: "destructive",
+      });
+    }
   };
 
   // Card dimensions - increased for new layout
@@ -301,26 +354,53 @@ const BranchTreeView = ({
             </div>
           </div>
 
-          {/* Delete button - visible on hover (not for main branch) */}
-          {!node.is_main && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={(e) => handleDeleteBranchClick(node, e)}
-                  className={cn(
-                    "p-2 rounded-lg transition-all duration-200",
-                    "hover:bg-destructive/15 hover:scale-110",
-                    "opacity-0 group-hover:opacity-100"
-                  )}
-                >
-                  <Trash2 className="w-4 h-4 text-destructive/70 hover:text-destructive" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>删除分支</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
+          {/* More menu - visible on hover */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className={cn(
+                  "p-2 rounded-lg transition-all duration-200",
+                  "hover:bg-muted/50 hover:scale-110",
+                  "opacity-0 group-hover:opacity-100"
+                )}
+              >
+                <MoreHorizontal className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent 
+              align="end" 
+              className="w-48 bg-popover border border-border shadow-lg z-50"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DropdownMenuItem 
+                onClick={() => handleRenameBranchClick(node)}
+                className="gap-2 cursor-pointer"
+              >
+                <Pencil className="w-4 h-4" />
+                重命名
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => handleCopyBranchClick(node)}
+                className="gap-2 cursor-pointer"
+              >
+                <Copy className="w-4 h-4" />
+                复制分支
+              </DropdownMenuItem>
+              {!node.is_main && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => handleDeleteBranchClick(node)}
+                    className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    删除分支
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         
         {/* === CONTENT === */}
@@ -812,6 +892,49 @@ const BranchTreeView = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Rename Dialog */}
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-primary" />
+              重命名分支
+            </DialogTitle>
+            <DialogDescription>
+              为该会话分支设置一个新名称
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="renameBranch">分支名称</Label>
+              <Input
+                id="renameBranch"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder="输入新的分支名称..."
+                className="bg-muted/30"
+                autoFocus
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
+              取消
+            </Button>
+            <Button 
+              onClick={handleConfirmRename}
+              disabled={!renameValue.trim() || renameValue.trim() === branchToRename?.name}
+              className="gap-2"
+            >
+              <Pencil className="w-4 h-4" />
+              确认重命名
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -306,6 +306,38 @@ export const useBranches = (projectId: string | null) => {
     }
   };
 
+  // Rename a branch
+  const renameBranch = async (branchId: string, newName: string): Promise<boolean> => {
+    const branch = branches.find((b) => b.id === branchId);
+    if (!branch) {
+      toast.error("找不到该分支");
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("branches")
+        .update({ name: newName })
+        .eq("id", branchId);
+
+      if (error) throw error;
+
+      setBranches((prev) => 
+        prev.map((b) => b.id === branchId ? { ...b, name: newName } : b)
+      );
+      
+      if (currentBranch?.id === branchId) {
+        setCurrentBranch((prev) => prev ? { ...prev, name: newName } : null);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error renaming branch:", error);
+      toast.error("重命名分支失败");
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchBranches();
   }, [fetchBranches]);
@@ -344,6 +376,7 @@ export const useBranches = (projectId: string | null) => {
     switchBranch,
     mergeBranch,
     deleteBranch,
+    renameBranch,
     refetch: fetchBranches,
   };
 };
