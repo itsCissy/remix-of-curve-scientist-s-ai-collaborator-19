@@ -14,9 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      branches: {
+        Row: {
+          branch_point_message_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_main: boolean
+          name: string
+          parent_branch_id: string | null
+          project_id: string
+        }
+        Insert: {
+          branch_point_message_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_main?: boolean
+          name?: string
+          parent_branch_id?: string | null
+          project_id: string
+        }
+        Update: {
+          branch_point_message_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_main?: boolean
+          name?: string
+          parent_branch_id?: string | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branches_parent_branch_id_fkey"
+            columns: ["parent_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branches_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborators: {
+        Row: {
+          avatar_color: string
+          browser_id: string
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+        }
+        Insert: {
+          avatar_color?: string
+          browser_id: string
+          created_at?: string
+          id?: string
+          name?: string
+          project_id: string
+        }
+        Update: {
+          avatar_color?: string
+          browser_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborators_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           agent_id: string | null
+          branch_id: string | null
+          collaborator_id: string | null
           content: string
           created_at: string
           files: Json | null
@@ -26,6 +121,8 @@ export type Database = {
         }
         Insert: {
           agent_id?: string | null
+          branch_id?: string | null
+          collaborator_id?: string | null
           content: string
           created_at?: string
           files?: Json | null
@@ -35,6 +132,8 @@ export type Database = {
         }
         Update: {
           agent_id?: string | null
+          branch_id?: string | null
+          collaborator_id?: string | null
           content?: string
           created_at?: string
           files?: Json | null
@@ -43,6 +142,20 @@ export type Database = {
           role?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "messages_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "messages_project_id_fkey"
             columns: ["project_id"]

@@ -24,6 +24,8 @@ export interface Message {
   agent_id: string | null;
   files: any | null;
   created_at: string;
+  branch_id: string | null;
+  collaborator_id: string | null;
 }
 
 export const useProjects = () => {
