@@ -4,6 +4,7 @@ import UserMessage from "./UserMessage";
 import AgentMessage from "./AgentMessage";
 import ChatInput from "./ChatInput";
 import { Message, parseMessageContent, generateId } from "@/lib/messageUtils";
+import { Agent, DEFAULT_AGENT } from "@/lib/agents";
 import { useToast } from "@/hooks/use-toast";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -11,6 +12,7 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const ChatArea = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<Agent>(DEFAULT_AGENT);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -21,6 +23,14 @@ const ChatArea = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const handleAgentChange = (agent: Agent) => {
+    setSelectedAgent(agent);
+    toast({
+      title: "已切换 Agent",
+      description: `当前使用: ${agent.name}`,
+    });
+  };
 
   const handleSend = async (input: string) => {
     if (!input.trim() || isLoading) return;
@@ -73,7 +83,10 @@ const ChatArea = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: messagesToSend }),
+        body: JSON.stringify({ 
+          messages: messagesToSend,
+          agentId: selectedAgent.id,
+        }),
       });
 
       if (!resp.ok) {
@@ -178,21 +191,20 @@ const ChatArea = () => {
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-background">
-      <ChatHeader projectName="Curve Agent" />
+      <ChatHeader projectName={selectedAgent.name} />
 
       <div className="flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
         <div className="max-w-[900px] mx-auto space-y-6">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[60vh] text-center">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <span className="text-2xl">🧪</span>
+                <span className="text-2xl">{selectedAgent.icon}</span>
               </div>
               <h2 className="text-xl font-semibold text-foreground mb-2">
-                欢迎使用 Curve Agent
+                欢迎使用 {selectedAgent.name}
               </h2>
               <p className="text-muted-foreground max-w-md">
-                我是专业的 AI 研究助手，可以帮助你进行分子结构分析、科学研究和数据分析。
-                发送消息开始对话吧！
+                {selectedAgent.description}。发送消息开始对话吧！
               </p>
             </div>
           ) : (
@@ -213,7 +225,12 @@ const ChatArea = () => {
         </div>
       </div>
 
-      <ChatInput onSend={handleSend} isLoading={isLoading} />
+      <ChatInput 
+        onSend={handleSend} 
+        isLoading={isLoading}
+        selectedAgent={selectedAgent}
+        onSelectAgent={handleAgentChange}
+      />
     </div>
   );
 };
