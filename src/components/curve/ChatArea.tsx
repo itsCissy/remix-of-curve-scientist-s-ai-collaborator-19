@@ -43,26 +43,42 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Calculate message count by branch
+  // Calculate message count and content by branch
   const [messageCountByBranch, setMessageCountByBranch] = useState<Record<string, number>>({});
+  const [messagesByBranch, setMessagesByBranch] = useState<Record<string, { content: string; role: string }[]>>({});
 
   useEffect(() => {
-    const fetchMessageCounts = async () => {
+    const fetchMessageData = async () => {
       if (!projectId || branches.length === 0) return;
       
       const counts: Record<string, number> = {};
+      const messagesData: Record<string, { content: string; role: string }[]> = {};
+      
       for (const branch of branches) {
+        // Get count
         const { count } = await supabase
           .from("messages")
           .select("*", { count: "exact", head: true })
           .eq("branch_id", branch.id);
         counts[branch.id] = count || 0;
+        
+        // Get first and last few messages for preview
+        const { data: messages } = await supabase
+          .from("messages")
+          .select("content, role")
+          .eq("branch_id", branch.id)
+          .order("created_at", { ascending: true })
+          .limit(10);
+        
+        messagesData[branch.id] = messages || [];
       }
+      
       setMessageCountByBranch(counts);
+      setMessagesByBranch(messagesData);
     };
     
-    fetchMessageCounts();
-  }, [projectId, branches]);
+    fetchMessageData();
+  }, [projectId, branches, dbMessages]);
 
   // Sync database messages to local state, filtered by current branch
   useEffect(() => {
@@ -385,6 +401,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
         onDeleteBranch={deleteBranch}
         onBack={() => setShowBranchTree(false)}
         messageCountByBranch={messageCountByBranch}
+        messagesByBranch={messagesByBranch}
       />
     );
   }
