@@ -193,6 +193,7 @@ export const useProjects = () => {
     }
   };
 
+  // Initial fetch
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
