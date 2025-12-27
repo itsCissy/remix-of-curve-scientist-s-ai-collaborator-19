@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Clock, RefreshCw, SquarePen, Smartphone } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Clock, RefreshCw, SquarePen, Smartphone, Search, X } from "lucide-react";
 import CurveLogo from "./CurveLogo";
 import ProjectItem from "./ProjectItem";
 import UserAvatar from "./UserAvatar";
@@ -7,6 +7,7 @@ import NewProjectDialog from "./NewProjectDialog";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
 import RenameDialog from "./RenameDialog";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 const projects = [
   { icon: "📋", name: "test", author: "程希希", isActive: true },
@@ -31,6 +32,17 @@ const Sidebar = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<{ name: string; index: number } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery.trim()) return projects;
+    const query = searchQuery.toLowerCase().trim();
+    return projects.filter(
+      (project) =>
+        project.name.toLowerCase().includes(query) ||
+        project.author.toLowerCase().includes(query)
+    );
+  }, [searchQuery]);
 
   const handleRename = (projectName: string, index: number) => {
     setSelectedProject({ name: projectName, index });
@@ -104,6 +116,11 @@ const Sidebar = () => {
             <div className="flex items-center gap-2 text-sm">
               <Clock className="w-4 h-4" />
               <span>所有项目</span>
+              {searchQuery && (
+                <span className="text-xs text-muted-foreground/70">
+                  ({filteredProjects.length}/{projects.length})
+                </span>
+              )}
             </div>
             <button className="p-1 rounded hover:bg-curve-hover transition-colors">
               <RefreshCw className="w-3.5 h-3.5" />
@@ -111,25 +128,54 @@ const Sidebar = () => {
           </div>
         </div>
 
+        {/* Search Input */}
+        <div className="px-3 mb-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜索项目名称或作者..."
+              className="pl-8 pr-8 h-8 text-sm bg-background/50"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted transition-colors"
+              >
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Project List */}
         <div className="flex-1 overflow-y-auto px-2 scrollbar-thin">
           <div className="space-y-0.5">
-            {projects.map((project, index) => (
-              <ProjectItem
-                key={index}
-                icon={project.icon}
-                name={project.name}
-                author={project.author}
-                isActive={project.isActive}
-                onRename={() => handleRename(project.name, index)}
-                onDelete={() => handleDelete(project.name, index)}
-                onCopy={() => handleCopy(project.name)}
-                onExport={() => handleExport(project.name)}
-                onShare={() => handleShare(project.name)}
-                onFavorite={() => handleFavorite(project.name)}
-                onOpen={() => handleOpen(project.name)}
-              />
-            ))}
+            {filteredProjects.length > 0 ? (
+              filteredProjects.map((project, index) => (
+                <ProjectItem
+                  key={index}
+                  icon={project.icon}
+                  name={project.name}
+                  author={project.author}
+                  isActive={project.isActive}
+                  onRename={() => handleRename(project.name, index)}
+                  onDelete={() => handleDelete(project.name, index)}
+                  onCopy={() => handleCopy(project.name)}
+                  onExport={() => handleExport(project.name)}
+                  onShare={() => handleShare(project.name)}
+                  onFavorite={() => handleFavorite(project.name)}
+                  onOpen={() => handleOpen(project.name)}
+                />
+              ))
+            ) : (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>未找到匹配的项目</p>
+                <p className="text-xs mt-1">尝试其他搜索关键词</p>
+              </div>
+            )}
           </div>
         </div>
 
