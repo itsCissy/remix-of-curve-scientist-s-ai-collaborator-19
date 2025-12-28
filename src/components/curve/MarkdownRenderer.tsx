@@ -3,9 +3,10 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Copy, Check } from "lucide-react";
-import { useState, useCallback, ReactNode, Fragment } from "react";
+import { useState, useCallback, ReactNode, Fragment, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import SmilesHighlight, { isValidSmiles } from "./SmilesHighlight";
+import { parseCSVData, MoleculeData } from "@/lib/moleculeDataUtils";
 
 interface MarkdownRendererProps {
   content: string;
@@ -33,6 +34,87 @@ const CopyButton = ({ code }: { code: string }) => {
         <Copy className="w-4 h-4" />
       )}
     </button>
+  );
+};
+
+// Check if CSV content contains molecule data
+const isMoleculeCSV = (content: string): boolean => {
+  const firstLine = content.split('\n')[0].toLowerCase();
+  const moleculeHeaders = ['smiles', 'chembl', 'id', 'similarity', 'mw', 'molecular_weight', 'logp', 'molecule'];
+  return moleculeHeaders.some(h => firstLine.includes(h));
+};
+
+// Simple CSV Table component
+interface CSVTableProps {
+  data: MoleculeData[];
+}
+
+const CSVTable = ({ data }: CSVTableProps) => {
+  if (data.length === 0) return null;
+
+  // Get all column keys and reorder them
+  const allKeys = useMemo(() => {
+    const keys = new Set<string>();
+    data.forEach(item => Object.keys(item).forEach(key => keys.add(key)));
+    
+    // Priority order - ID first, then Name, then SMILES, then others
+    const priority = ['id', 'chembl_id', 'molecule_name', 'name', 'smiles'];
+    const sortedKeys = Array.from(keys).sort((a, b) => {
+      const aIdx = priority.findIndex(p => a.toLowerCase().includes(p));
+      const bIdx = priority.findIndex(p => b.toLowerCase().includes(p));
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+      return a.localeCompare(b);
+    });
+    return sortedKeys;
+  }, [data]);
+
+  const formatHeader = (key: string) => {
+    const nameMap: Record<string, string> = {
+      'chembl_id': 'ChEMBL_ID',
+      'molecule_name': 'Molecule_Name',
+      'smiles': 'SMILES',
+      'similarity': 'Similarity',
+      'tanimoto_similarity': 'Tanimoto_Similarity',
+      'mw': 'MW',
+      'molecular_weight': 'Molecular_Weight',
+      'logp': 'LogP',
+      'hbd': 'HBD',
+      'hba': 'HBA',
+    };
+    return nameMap[key.toLowerCase()] || key;
+  };
+
+  return (
+    <div className="my-4 overflow-x-auto rounded-lg border border-border/50">
+      <table className="w-full border-collapse text-sm">
+        <thead className="bg-muted/50">
+          <tr>
+            {allKeys.map(key => (
+              <th key={key} className="px-4 py-2.5 text-left font-semibold text-foreground border-b border-border/50 whitespace-nowrap">
+                {formatHeader(key)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, idx) => (
+            <tr key={idx} className="hover:bg-muted/30 transition-colors">
+              {allKeys.map(key => (
+                <td key={key} className="px-4 py-2.5 text-foreground border-b border-border/30 max-w-[300px]">
+                  <span className={cn(
+                    key.toLowerCase() === 'smiles' && "font-mono text-xs text-muted-foreground truncate block"
+                  )} title={String(row[key] ?? '')}>
+                    {row[key] ?? '-'}
+                  </span>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 };
 
@@ -94,6 +176,14 @@ const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) => {
                 return <SmilesHighlight smiles={codeString} />;
               }
               
+              // 检查是否是 CSV 分子数据，如果是则渲染为表格
+              if ((match[1] === "csv" || match[1] === "text") && isMoleculeCSV(codeString)) {
+                const moleculeData = parseCSVData(codeString);
+                if (moleculeData.length > 0) {
+                  return <CSVTable data={moleculeData} />;
+                }
+              }
+              
               return (
                 <div className="group relative my-3 rounded-lg overflow-hidden border border-border/50">
                   <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border/50">
@@ -134,6 +224,14 @@ const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) => {
                   {children}
                 </code>
               );
+            }
+
+            // 检查无语言标记的代码块是否是 CSV 分子数据
+            if (isMoleculeCSV(codeString)) {
+              const moleculeData = parseCSVData(codeString);
+              if (moleculeData.length > 0) {
+                return <CSVTable data={moleculeData} />;
+              }
             }
 
             return (
