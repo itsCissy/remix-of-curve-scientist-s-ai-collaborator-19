@@ -289,7 +289,7 @@ const MoleculeDataTable = ({
               {paginatedData.map((item, index) => (
                 <TableRow 
                   key={item.id || index}
-                  className="group"
+                  className="hover:bg-muted/30"
                 >
                   {/* ID cell first */}
                   <TableCell className="text-sm font-medium">
