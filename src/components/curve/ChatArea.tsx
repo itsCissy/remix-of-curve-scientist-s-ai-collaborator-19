@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMessages } from "@/hooks/useProjects";
 import { useBranches, useCollaborator } from "@/hooks/useBranches";
 import { supabase } from "@/integrations/supabase/client";
+import { extractFilesFromContent, detectCategory } from "@/hooks/useFileAssets";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
@@ -391,13 +392,30 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
 
       // Save assistant message to database with branch info
       if (assistantContent) {
-        await supabase.from("messages").insert({
+        const { data: savedMessage } = await supabase.from("messages").insert({
           project_id: projectId,
           role: "assistant",
           content: assistantContent,
           agent_id: selectedAgent.id,
           branch_id: branchId,
-        });
+        }).select().single();
+
+        // Extract and save files from assistant response
+        if (savedMessage && projectId) {
+          const extractedFiles = extractFilesFromContent(assistantContent);
+          for (const file of extractedFiles) {
+            await supabase.from("file_assets").insert({
+              project_id: projectId,
+              branch_id: branchId,
+              message_id: savedMessage.id,
+              name: file.name,
+              type: file.type,
+              category: detectCategory(file.type, file.name),
+              content: file.content,
+              size: file.size,
+            });
+          }
+        }
       }
     } catch (error) {
       console.error("Chat error:", error);
