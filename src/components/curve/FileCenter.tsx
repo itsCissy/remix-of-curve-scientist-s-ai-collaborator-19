@@ -57,6 +57,7 @@ interface FileCenterProps {
   onDeleteAsset: (id: string) => Promise<boolean>;
   onNavigateToMessage: (messageId: string, branchId: string) => void;
   onNavigateToBranch?: (branchId: string) => void;
+  onBack?: () => void;
 }
 
 // Build branch tree structure
@@ -108,6 +109,7 @@ const FileCenter = ({
   onDeleteAsset,
   onNavigateToMessage,
   onNavigateToBranch,
+  onBack,
 }: FileCenterProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
@@ -412,42 +414,63 @@ const FileCenter = ({
   };
 
   return (
-    <div className="h-full flex bg-background">
-      {/* Left Sidebar - Folder Tree */}
-      <div className="w-72 border-r border-border flex flex-col bg-card/50">
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center gap-2 mb-3">
+    <div className="h-full flex flex-col bg-background">
+      {/* Top Header with Back Button */}
+      {onBack && (
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-border bg-card/50">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors font-medium"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>返回会话</span>
+          </button>
+          <span className="text-muted-foreground">|</span>
+          <div className="flex items-center gap-2">
             <FolderTree className="w-5 h-5 text-primary" />
             <h2 className="font-semibold text-foreground">文件夹</h2>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setViewMode("tree")}
-              className={cn(
-                "flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                viewMode === "tree"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              按分支
-            </button>
-            <button
-              onClick={() => {
-                setViewMode("all");
-                setSelectedBranchId(null);
-              }}
-              className={cn(
-                "flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                viewMode === "all"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              全部
-            </button>
-          </div>
         </div>
+      )}
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar - Folder Tree */}
+        <div className="w-72 border-r border-border flex flex-col bg-card/50">
+          <div className="p-4 border-b border-border">
+            {!onBack && (
+              <div className="flex items-center gap-2 mb-3">
+                <FolderTree className="w-5 h-5 text-primary" />
+                <h2 className="font-semibold text-foreground">文件夹</h2>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode("tree")}
+                className={cn(
+                  "flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                  viewMode === "tree"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                )}
+              >
+                按分支
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode("all");
+                  setSelectedBranchId(null);
+                }}
+                className={cn(
+                  "flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                  viewMode === "all"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                )}
+              >
+                全部
+              </button>
+            </div>
+          </div>
 
         <ScrollArea className="flex-1">
           <div className="p-2">
@@ -645,6 +668,7 @@ const FileCenter = ({
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 };

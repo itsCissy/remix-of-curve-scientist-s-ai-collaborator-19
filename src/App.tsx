@@ -7,7 +7,6 @@ import MainLayout from "./layouts/MainLayout";
 import Index from "./pages/Index";
 import Agent from "./pages/Agent";
 import Workflow from "./pages/Workflow";
-import Files from "./pages/Files";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,7 +20,6 @@ const App = () => (
         <Routes>
           <Route element={<MainLayout />}>
             <Route path="/" element={<Index />} />
-            <Route path="/files" element={<Files />} />
             <Route path="/agent" element={<Agent />} />
             <Route path="/workflow" element={<Workflow />} />
           </Route>
