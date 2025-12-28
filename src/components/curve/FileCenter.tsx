@@ -420,17 +420,23 @@ const FileCenter = ({
       {/* Top Header with Back Button */}
       {onBack && (
         <div className="flex-shrink-0 flex items-center gap-3 px-6 py-4 border-b border-border bg-card">
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onBack}
-            className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors font-medium"
+            className="gap-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>{backText}</span>
-          </button>
-          <span className="text-muted-foreground">|</span>
+            {backText}
+          </Button>
+          <div className="h-5 w-px bg-border" />
           <div className="flex items-center gap-2">
-            <FolderTree className="w-5 h-5 text-primary" />
-            <h2 className="font-semibold text-foreground">文件夹</h2>
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <FolderTree className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-base font-semibold text-foreground">文件夹</h1>
+            </div>
           </div>
         </div>
       )}
