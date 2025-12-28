@@ -82,32 +82,72 @@ const CSVTable = ({ data }: CSVTableProps) => {
       'logp': 'LogP',
       'hbd': 'HBD',
       'hba': 'HBA',
+      'reported_target': 'Reported_Target',
+      'reported_target_id': 'Reported_Target_ID',
     };
     return nameMap[key.toLowerCase()] || key;
   };
 
+  // Check if column needs width limit
+  const isLongTextColumn = (key: string) => {
+    const longTextColumns = ['molecule_name', 'smiles', 'reported_target', 'name', 'description'];
+    return longTextColumns.some(col => key.toLowerCase().includes(col));
+  };
+
+  // Check if column should not wrap
+  const isIdColumn = (key: string) => {
+    const idColumns = ['id', 'chembl_id', 'target_id'];
+    return idColumns.some(col => key.toLowerCase().includes(col));
+  };
+
   return (
-    <div className="my-4 overflow-x-auto rounded-lg border border-border/50">
-      <table className="w-full border-collapse text-sm">
-        <thead className="bg-muted/50">
+    <div className="my-4 overflow-x-auto rounded-lg border-2 border-slate-200 dark:border-slate-700 shadow-sm">
+      <table className="w-full border-collapse text-sm table-fixed">
+        <thead className="bg-slate-100 dark:bg-slate-800/80">
           <tr>
-            {allKeys.map(key => (
-              <th key={key} className="px-4 py-2.5 text-left font-semibold text-foreground border-b border-border/50 whitespace-nowrap">
+            {allKeys.map((key, idx) => (
+              <th 
+                key={key} 
+                className={cn(
+                  "px-4 py-3 text-left font-semibold text-foreground border-b-2 border-slate-300 dark:border-slate-600",
+                  isIdColumn(key) && "whitespace-nowrap w-[150px]",
+                  isLongTextColumn(key) && "max-w-[250px] min-w-[150px]",
+                  idx < allKeys.length - 1 && "border-r border-slate-200 dark:border-slate-700"
+                )}
+              >
                 {formatHeader(key)}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
           {data.map((row, idx) => (
-            <tr key={idx} className="hover:bg-muted/30 transition-colors">
-              {allKeys.map(key => (
-                <td key={key} className="px-4 py-2.5 text-foreground border-b border-border/30 max-w-[300px]">
-                  <span className={cn(
-                    key.toLowerCase() === 'smiles' && "font-mono text-xs text-muted-foreground truncate block"
-                  )} title={String(row[key] ?? '')}>
-                    {row[key] ?? '-'}
-                  </span>
+            <tr 
+              key={idx} 
+              className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors"
+            >
+              {allKeys.map((key, colIdx) => (
+                <td 
+                  key={key} 
+                  className={cn(
+                    "px-4 py-3 text-foreground",
+                    isIdColumn(key) && "whitespace-nowrap font-medium",
+                    colIdx < allKeys.length - 1 && "border-r border-slate-200 dark:border-slate-700"
+                  )}
+                >
+                  {isLongTextColumn(key) ? (
+                    <span 
+                      className={cn(
+                        "block truncate max-w-[250px]",
+                        key.toLowerCase().includes('smiles') && "font-mono text-xs text-muted-foreground"
+                      )} 
+                      title={String(row[key] ?? '')}
+                    >
+                      {row[key] ?? '-'}
+                    </span>
+                  ) : (
+                    <span>{row[key] ?? '-'}</span>
+                  )}
                 </td>
               ))}
             </tr>
