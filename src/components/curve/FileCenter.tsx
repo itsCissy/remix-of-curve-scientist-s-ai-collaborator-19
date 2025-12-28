@@ -490,9 +490,9 @@ const FileCenter = ({
         </div>
 
         {/* Main Content - fills remaining width */}
-        <div className="flex-1 h-full flex flex-col bg-muted/20 overflow-hidden">
+        <div className="flex-1 min-w-0 h-full flex flex-col bg-muted/20 max-w-none overflow-hidden">
           {/* Header with Breadcrumb */}
-          <div className="flex-shrink-0 px-6 py-4 border-b border-border bg-card">
+          <div className="flex-shrink-0 w-full px-6 py-4 border-b border-border bg-card">
             <div className="flex items-center justify-between mb-4">
               {/* Breadcrumb */}
               <div className="flex items-center gap-2 text-sm">
