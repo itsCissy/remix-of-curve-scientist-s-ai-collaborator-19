@@ -43,7 +43,7 @@ const MoleculeDataTable = ({
   const [copied, setCopied] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
 
-  // Get all available columns from data
+  // Get all available columns from data - ID first, then Structure, then SMILES, then other properties
   const columns = useMemo(() => {
     if (data.length === 0) return [];
     
@@ -52,7 +52,7 @@ const MoleculeDataTable = ({
       Object.keys(item).forEach(key => allKeys.add(key));
     });
     
-    // Priority order for columns
+    // Priority order: ID first, SMILES after structure (structure is separate column), then other metrics
     const priorityOrder = ['id', 'smiles', 'similarity', 'mw', 'logp', 'hbd', 'hba', 'tpsa', 'rotatable_bonds'];
     const sortedKeys = Array.from(allKeys).sort((a, b) => {
       const aIndex = priorityOrder.indexOf(a.toLowerCase());
@@ -250,11 +250,28 @@ const MoleculeDataTable = ({
           <Table>
             <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm z-10">
               <TableRow className="hover:bg-transparent">
+                {/* ID column first */}
+                <TableHead 
+                  className="cursor-pointer select-none hover:bg-muted/50 transition-colors"
+                  onClick={() => handleSort('id')}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>ID</span>
+                    {getSortIcon('id')}
+                  </div>
+                </TableHead>
                 {/* Structure column */}
                 <TableHead className="w-[100px] text-center">
                   结构
                 </TableHead>
-                {columns.filter(col => col.toLowerCase() !== 'smiles').map((col) => (
+                {/* SMILES column */}
+                <TableHead className="min-w-[200px] max-w-[300px]">
+                  <div className="flex items-center gap-1.5">
+                    <span>SMILES</span>
+                  </div>
+                </TableHead>
+                {/* Other columns (exclude id, smiles) */}
+                {columns.filter(col => !['id', 'smiles'].includes(col.toLowerCase())).map((col) => (
                   <TableHead 
                     key={col}
                     className="cursor-pointer select-none hover:bg-muted/50 transition-colors"
@@ -274,6 +291,10 @@ const MoleculeDataTable = ({
                   key={item.id || index}
                   className="group"
                 >
+                  {/* ID cell first */}
+                  <TableCell className="text-sm font-medium">
+                    {item.id || '-'}
+                  </TableCell>
                   {/* Structure cell */}
                   <TableCell className="p-2">
                     {item.smiles && (
@@ -284,7 +305,12 @@ const MoleculeDataTable = ({
                       />
                     )}
                   </TableCell>
-                  {columns.filter(col => col.toLowerCase() !== 'smiles').map((col) => (
+                  {/* SMILES cell */}
+                  <TableCell className="text-xs font-mono text-muted-foreground max-w-[300px] truncate" title={item.smiles}>
+                    {item.smiles || '-'}
+                  </TableCell>
+                  {/* Other property cells */}
+                  {columns.filter(col => !['id', 'smiles'].includes(col.toLowerCase())).map((col) => (
                     <TableCell key={col} className="text-sm">
                       {formatValue(item[col], col)}
                     </TableCell>
