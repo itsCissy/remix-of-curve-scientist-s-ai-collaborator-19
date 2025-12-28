@@ -414,7 +414,7 @@ const FileCenter = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-background overflow-hidden">
+    <div className="flex-1 flex flex-col bg-background overflow-hidden min-h-0">
       {/* Top Header with Back Button */}
       {onBack && (
         <div className="flex-shrink-0 flex items-center gap-3 px-6 py-4 border-b border-border bg-card/50">
@@ -433,9 +433,9 @@ const FileCenter = ({
         </div>
       )}
 
-      <div className="flex-1 flex flex-row min-h-0">
+      <div className="flex-1 flex flex-row min-h-0 overflow-hidden">
         {/* Left Sidebar - Folder Tree */}
-        <div className="w-64 lg:w-72 flex-shrink-0 border-r border-border flex flex-col bg-card/50">
+        <div className="w-64 lg:w-72 flex-shrink-0 border-r border-border flex flex-col bg-card/50 h-full">
           <div className="flex-shrink-0 p-4 border-b border-border">
             {!onBack && (
               <div className="flex items-center gap-2 mb-3">
@@ -490,7 +490,7 @@ const FileCenter = ({
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-muted/30">
           {/* Header with Breadcrumb */}
           <div className="flex-shrink-0 px-6 py-4 border-b border-border bg-background">
             <div className="flex items-center justify-between mb-4">
