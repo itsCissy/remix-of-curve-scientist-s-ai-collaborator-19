@@ -440,6 +440,214 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
     return allCollaborators.find((c) => c.id === collaboratorId) || null;
   };
 
+  // Track edited message IDs
+  const [editedMessageIds, setEditedMessageIds] = useState<Set<string>>(new Set());
+
+  // Handle edit message - deletes subsequent messages and re-triggers agent
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    if (!projectId || isLoading) return;
+    
+    // Find the message index
+    const messageIndex = localMessages.findIndex(m => m.id === messageId);
+    if (messageIndex === -1) return;
+    
+    const originalMessage = localMessages[messageIndex];
+    
+    // Get all message IDs after this one (to delete)
+    const messagesToDelete = localMessages.slice(messageIndex + 1).map(m => m.id);
+    
+    // Delete subsequent messages from database
+    if (messagesToDelete.length > 0) {
+      await supabase
+        .from("messages")
+        .delete()
+        .in("id", messagesToDelete);
+    }
+    
+    // Update the edited message in database
+    await supabase
+      .from("messages")
+      .update({ content: newContent })
+      .eq("id", messageId);
+    
+    // Update local state - remove subsequent messages and update this one
+    const updatedMessages = localMessages.slice(0, messageIndex + 1);
+    updatedMessages[messageIndex] = {
+      ...originalMessage,
+      content: newContent,
+    };
+    setLocalMessages(updatedMessages);
+    
+    // Track this message as edited
+    setEditedMessageIds(prev => new Set(prev).add(messageId));
+    
+    // Now re-trigger the agent response
+    setIsLoading(true);
+    
+    let branchId = currentBranch?.id;
+    if (!branchId) {
+      const mainBranch = await ensureMainBranch();
+      branchId = mainBranch?.id;
+    }
+    
+    let assistantContent = "";
+    
+    const upsertAssistant = (nextChunk: string) => {
+      assistantContent += nextChunk;
+      setLocalMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && last.isStreaming) {
+          return prev.map((m, i) =>
+            i === prev.length - 1
+              ? { ...m, content: assistantContent, isStreaming: true }
+              : m
+          );
+        }
+        return [
+          ...prev,
+          {
+            id: generateId(),
+            role: "assistant" as const,
+            content: assistantContent,
+            timestamp: new Date(),
+            isStreaming: true,
+          },
+        ];
+      });
+    };
+    
+    try {
+      const messagesToSend = updatedMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ 
+          messages: messagesToSend,
+          agentId: selectedAgent.id,
+        }),
+      });
+
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        toast({
+          title: "重新发送失败",
+          description: errorData.error || "请稍后重试",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      if (!resp.body) {
+        throw new Error("No response body");
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = "";
+      let streamDone = false;
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") {
+            streamDone = true;
+            break;
+          }
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) upsertAssistant(content);
+          } catch {
+            textBuffer = line + "\n" + textBuffer;
+            break;
+          }
+        }
+      }
+
+      // Final flush
+      if (textBuffer.trim()) {
+        for (let raw of textBuffer.split("\n")) {
+          if (!raw) continue;
+          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
+          if (raw.startsWith(":") || raw.trim() === "") continue;
+          if (!raw.startsWith("data: ")) continue;
+          const jsonStr = raw.slice(6).trim();
+          if (jsonStr === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) upsertAssistant(content);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      // Mark streaming as done
+      setLocalMessages((prev) =>
+        prev.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
+      );
+
+      // Save assistant message to database
+      if (assistantContent) {
+        const { data: savedMessage } = await supabase.from("messages").insert({
+          project_id: projectId,
+          role: "assistant",
+          content: assistantContent,
+          agent_id: selectedAgent.id,
+          branch_id: branchId,
+        }).select().single();
+
+        // Extract and save files from assistant response
+        if (savedMessage && projectId) {
+          const extractedFiles = extractFilesFromContent(assistantContent);
+          for (const file of extractedFiles) {
+            await supabase.from("file_assets").insert({
+              project_id: projectId,
+              branch_id: branchId,
+              message_id: savedMessage.id,
+              name: file.name,
+              type: file.type,
+              category: detectCategory(file.type, file.name),
+              content: file.content,
+              size: file.size,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Edit resend error:", error);
+      toast({
+        title: "重新发送失败",
+        description: "网络错误，请检查连接后重试",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handle merge branch request
   const handleMergeBranch = (branchId: string, conclusion?: string) => {
     setMergeBranchId(branchId);
@@ -605,6 +813,8 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
                   messageId={message.id}
                   onCreateBranch={handleCreateBranch}
                   collaborator={getCollaboratorForMessage(message.collaboratorId)}
+                  isEdited={editedMessageIds.has(message.id || "")}
+                  onEditMessage={handleEditMessage}
                 />
               ) : (
                 <AgentMessage
