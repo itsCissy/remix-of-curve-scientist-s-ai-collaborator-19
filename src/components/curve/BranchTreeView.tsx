@@ -720,26 +720,24 @@ const BranchTreeView = ({
         
         {/* Right side controls */}
         <div className="flex items-center gap-3">
-          {/* File Center button */}
+          {/* File Center button - consistent with ChatHeader style */}
           {onShowFileCenter && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={onShowFileCenter}
-                  className="gap-2 text-muted-foreground hover:text-foreground relative"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-medium relative"
                 >
                   <Folder className="w-4 h-4" />
-                  文件中心
+                  <span>文件夹</span>
                   {fileUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] rounded-full flex items-center justify-center">
-                      {fileUnreadCount > 9 ? '9+' : fileUnreadCount}
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 bg-destructive text-destructive-foreground text-[10px] font-semibold rounded-full flex items-center justify-center">
+                      {fileUnreadCount > 99 ? "99+" : fileUnreadCount}
                     </span>
                   )}
-                </Button>
+                </button>
               </TooltipTrigger>
-              <TooltipContent>查看项目文件</TooltipContent>
+              <TooltipContent>查看文件夹</TooltipContent>
             </Tooltip>
           )}
           

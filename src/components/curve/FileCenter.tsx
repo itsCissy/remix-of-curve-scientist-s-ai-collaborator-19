@@ -58,6 +58,7 @@ interface FileCenterProps {
   onNavigateToMessage: (messageId: string, branchId: string) => void;
   onNavigateToBranch?: (branchId: string) => void;
   onBack?: () => void;
+  backText?: string;
 }
 
 // Build branch tree structure
@@ -110,6 +111,7 @@ const FileCenter = ({
   onNavigateToMessage,
   onNavigateToBranch,
   onBack,
+  backText = "返回会话",
 }: FileCenterProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
@@ -423,7 +425,7 @@ const FileCenter = ({
             className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors font-medium"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>返回会话</span>
+            <span>{backText}</span>
           </button>
           <span className="text-muted-foreground">|</span>
           <div className="flex items-center gap-2">

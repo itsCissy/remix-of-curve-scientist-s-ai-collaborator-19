@@ -47,6 +47,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
   const [showSwitchDialog, setShowSwitchDialog] = useState(false);
   const [showBranchTree, setShowBranchTree] = useState(false);
   const [showFileCenter, setShowFileCenter] = useState(false);
+  const [fileCenterSource, setFileCenterSource] = useState<"chat" | "branch">("chat");
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [mergeBranchId, setMergeBranchId] = useState<string | null>(null);
@@ -737,7 +738,13 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
           onDeleteAsset={deleteAsset}
           onNavigateToMessage={handleNavigateToMessage}
           onNavigateToBranch={handleNavigateToBranch}
-          onBack={() => setShowFileCenter(false)}
+          onBack={() => {
+            setShowFileCenter(false);
+            if (fileCenterSource === "branch") {
+              setShowBranchTree(true);
+            }
+          }}
+          backText={fileCenterSource === "branch" ? "返回视图" : "返回会话"}
         />
       </div>
     );
@@ -764,6 +771,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
           onCreateBranch={handleCreateBranchFromView}
           onShowFileCenter={() => {
             resetUnreadCount();
+            setFileCenterSource("branch");
             setShowBranchTree(false);
             setShowFileCenter(true);
           }}
@@ -790,6 +798,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
         onShowBranchTree={() => setShowBranchTree(true)}
         onShowFileCenter={() => {
           resetUnreadCount();
+          setFileCenterSource("chat");
           setShowFileCenter(true);
         }}
         fileUnreadCount={unreadCount}
