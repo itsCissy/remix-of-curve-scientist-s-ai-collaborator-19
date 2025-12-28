@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import MarkdownRenderer from "./MarkdownRenderer";
 import ThinkingLoader from "./ThinkingLoader";
 import FileViewer, { FileAttachment } from "./FileViewer";
+import MoleculeResultTabs from "./MoleculeResultTabs";
+import { ParsedMoleculeResult } from "@/lib/moleculeDataUtils";
 // Typewriter hook for character-by-character display
 const useTypewriter = (text: string, speed: number = 20, enabled: boolean = true) => {
   const [displayedText, setDisplayedText] = useState("");
@@ -324,6 +326,7 @@ interface StructuredMessageProps {
   normalContent?: string;
   isStreaming?: boolean;
   files?: FileAttachment[];
+  moleculeData?: ParsedMoleculeResult;
 }
 
 const StructuredMessage = ({
@@ -333,6 +336,7 @@ const StructuredMessage = ({
   normalContent,
   isStreaming,
   files,
+  moleculeData,
 }: StructuredMessageProps) => {
   const hasStructuredContent = reasoning || (tools && tools.length > 0) || conclusion;
   const streaming = Boolean(isStreaming);
@@ -362,6 +366,14 @@ const StructuredMessage = ({
             <ConclusionSection content={conclusion} animate={streaming} enableTypewriter={false} />
           )}
         </div>
+      )}
+
+      {/* Molecule data visualization */}
+      {moleculeData && moleculeData.molecules.length > 0 && (
+        <MoleculeResultTabs 
+          data={moleculeData.molecules}
+          description={moleculeData.description}
+        />
       )}
 
       {/* File attachments */}
