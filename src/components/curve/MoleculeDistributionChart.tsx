@@ -8,12 +8,13 @@ interface MoleculeDistributionChartProps {
   className?: string;
 }
 
+// XtalPi Brand Colors for charts
 const COLORS = [
-  'hsl(228, 76%, 59%)',  // primary
-  'hsl(262, 83%, 58%)',  // violet
-  'hsl(142, 71%, 45%)',  // emerald
-  'hsl(38, 92%, 50%)',   // amber
-  'hsl(199, 89%, 48%)',  // blue
+  '#123aff',  // XtalPi Blue
+  '#00ff9a',  // XtalPi Green
+  '#00ffff',  // XtalPi Cyan
+  '#00a29c',  // XtalPi Teal (Green dark)
+  '#1609a0',  // XtalPi Deep Blue
 ];
 
 const MoleculeDistributionChart = ({ data, className }: MoleculeDistributionChartProps) => {

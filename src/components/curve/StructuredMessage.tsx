@@ -68,7 +68,7 @@ const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
         "rounded-lg border overflow-hidden transition-all duration-300",
         streaming && "animate-fade-in",
         streaming
-          ? "bg-amber-500/5 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.1)]"
+          ? "bg-primary/5 border-primary/30 shadow-[0_0_15px_rgba(18,58,255,0.15)]"
           : "bg-muted/30 border-border/50"
       )}
     >
@@ -80,26 +80,26 @@ const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
           <Brain
             className={cn(
               "w-4 h-4 transition-colors duration-300",
-              streaming ? "text-amber-500" : "text-amber-500/70"
+              streaming ? "text-primary" : "text-primary/70"
             )}
           />
           {streaming && (
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full animate-ping" />
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-ping" />
           )}
         </div>
         <span className="text-sm font-medium text-foreground">推理过程</span>
 
         {/* Progress indicator */}
         {streaming && (
-          <span className="ml-2 flex items-center gap-2 px-2 py-0.5 bg-amber-500/10 rounded-full">
-            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+          <span className="ml-2 flex items-center gap-2 px-2 py-0.5 bg-primary/10 rounded-full">
+            <span className="text-xs text-primary font-medium">
               {Math.round(progress)}%
             </span>
           </span>
         )}
 
         {!streaming && content && (
-          <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+          <span className="ml-2 text-xs text-accent bg-accent/10 px-2 py-0.5 rounded-full">
             完成
           </span>
         )}
@@ -121,7 +121,7 @@ const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
         <div className="px-4 pb-2">
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-300 ease-out"
+              className="h-full bg-gradient-xtalpi-blue rounded-full transition-all duration-300 ease-out"
               style={{ width: `${progress}%` }}
             >
               <div className="h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
@@ -145,7 +145,7 @@ const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
           >
             {content}
             {streaming && (
-              <span className="inline-block w-0.5 h-4 bg-amber-500 ml-0.5 animate-pulse" />
+              <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse" />
             )}
           </div>
         </div>
@@ -184,17 +184,17 @@ const ToolsSection = ({ tools, isNew }: ToolsSectionProps) => {
   return (
     <div
       className={cn(
-        "bg-blue-500/5 rounded-lg border border-blue-500/20 overflow-hidden",
+        "bg-primary/5 rounded-lg border border-primary/20 overflow-hidden",
         animated && "animate-fade-in"
       )}
     >
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 px-4 py-3 hover:bg-blue-500/10 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-3 hover:bg-primary/10 transition-colors"
       >
-        <Wrench className="w-4 h-4 text-blue-500" />
+        <Wrench className="w-4 h-4 text-primary" />
         <span className="text-sm font-medium text-foreground">调用工具与知识库</span>
-        <span className="ml-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full font-medium">
+        <span className="ml-2 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full font-medium">
           {tools.length} 项
         </span>
         <div className="ml-auto">
@@ -221,14 +221,14 @@ const ToolsSection = ({ tools, isNew }: ToolsSectionProps) => {
                 <span
                   key={index}
                   className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-xs font-medium transition-all duration-300",
+                    "inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-primary/10 text-primary rounded-md text-xs font-medium transition-all duration-300",
                     index < visibleTools
                       ? "opacity-100 translate-y-0 scale-100"
                       : "opacity-0 translate-y-2 scale-95"
                   )}
                   style={{ transitionDelay: `${index * 50}ms` }}
                 >
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                   {tool}
                 </span>
               ))}
@@ -265,22 +265,22 @@ const ConclusionSection = ({ content, enableTypewriter, animate }: ConclusionSec
   return (
     <div
       className={cn(
-        "bg-emerald-500/5 rounded-lg border border-emerald-500/20 overflow-hidden shadow-[0_0_20px_rgba(16,185,129,0.1)]",
+        "bg-accent/5 rounded-lg border border-accent/20 overflow-hidden shadow-[0_0_20px_rgba(0,255,154,0.1)]",
         shouldAnimate && "animate-scale-in"
       )}
     >
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-emerald-500/10 bg-emerald-500/5">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-accent/10 bg-accent/5">
         <div className="relative">
-          <CheckCircle className="w-4 h-4 text-emerald-500" />
-          <Sparkles className="w-3 h-3 text-emerald-400 absolute -top-1 -right-1 animate-pulse" />
+          <CheckCircle className="w-4 h-4 text-accent" />
+          <Sparkles className="w-3 h-3 text-accent/80 absolute -top-1 -right-1 animate-pulse" />
         </div>
         <span className="text-sm font-medium text-foreground">分析结论</span>
-        <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+        <span className="text-xs text-accent bg-accent/10 px-2 py-0.5 rounded-full">
           {isComplete ? "已完成" : "输出中..."}
         </span>
         <button
           onClick={handleCopy}
-          className="ml-auto p-1.5 rounded-md hover:bg-emerald-500/10 transition-colors text-emerald-600 dark:text-emerald-400"
+          className="ml-auto p-1.5 rounded-md hover:bg-accent/10 transition-colors text-accent"
           title="复制结论"
         >
           {copied ? (
@@ -293,7 +293,7 @@ const ConclusionSection = ({ content, enableTypewriter, animate }: ConclusionSec
       <div className="px-4 py-3 text-sm">
         <MarkdownRenderer content={displayedText} />
         {!isComplete && shouldType && (
-          <span className="inline-block w-0.5 h-4 bg-emerald-500 ml-0.5 animate-pulse" />
+          <span className="inline-block w-0.5 h-4 bg-accent ml-0.5 animate-pulse" />
         )}
       </div>
     </div>
