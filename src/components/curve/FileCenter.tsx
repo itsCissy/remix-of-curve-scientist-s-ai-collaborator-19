@@ -414,10 +414,10 @@ const FileCenter = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="h-full flex flex-col bg-background overflow-hidden">
       {/* Top Header with Back Button */}
       {onBack && (
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-border bg-card/50">
+        <div className="flex-shrink-0 flex items-center gap-3 px-6 py-4 border-b border-border bg-card/50">
           <button
             onClick={onBack}
             className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors font-medium"
@@ -433,10 +433,10 @@ const FileCenter = ({
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-row min-h-0">
         {/* Left Sidebar - Folder Tree */}
-        <div className="w-72 border-r border-border flex flex-col bg-card/50">
-          <div className="p-4 border-b border-border">
+        <div className="w-64 lg:w-72 flex-shrink-0 border-r border-border flex flex-col bg-card/50">
+          <div className="flex-shrink-0 p-4 border-b border-border">
             {!onBack && (
               <div className="flex items-center gap-2 mb-3">
                 <FolderTree className="w-5 h-5 text-primary" />
@@ -472,122 +472,123 @@ const FileCenter = ({
             </div>
           </div>
 
-        <ScrollArea className="flex-1">
-          <div className="p-2">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+          <ScrollArea className="flex-1">
+            <div className="p-2">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+                </div>
+              ) : branchTree.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  暂无分支
+                </div>
+              ) : (
+                branchTree.map((node) => renderFolderNode(node))
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {/* Header with Breadcrumb */}
+          <div className="flex-shrink-0 px-6 py-4 border-b border-border bg-background">
+            <div className="flex items-center justify-between mb-4">
+              {/* Breadcrumb */}
+              <div className="flex items-center gap-2 text-sm">
+                <button
+                  onClick={() => setSelectedBranchId(null)}
+                  className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Home className="w-4 h-4" />
+                  <span>{projectName}</span>
+                </button>
+                
+                {breadcrumbPath.map((branch, index) => (
+                  <div key={branch.id} className="flex items-center gap-2">
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    <button
+                      onClick={() => setSelectedBranchId(branch.id)}
+                      className={cn(
+                        "flex items-center gap-1.5 transition-colors",
+                        index === breadcrumbPath.length - 1
+                          ? "text-foreground font-medium"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {branch.is_main ? (
+                        <Folder className="w-4 h-4 text-primary" />
+                      ) : (
+                        <Folder className="w-4 h-4 text-amber-500" />
+                      )}
+                      <span>{branch.name}</span>
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : branchTree.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                暂无分支
+
+              {/* File count */}
+              <div className="text-sm text-muted-foreground">
+                {currentFiles.length} 个文件
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜索文件..."
+                className="pl-9 pr-9"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* File List */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {isLoading ? (
+              <div className="h-full flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+              </div>
+            ) : currentFiles.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                <FolderOpen className="w-16 h-16 mb-4 opacity-30" />
+                <p className="text-lg font-medium">暂无文件</p>
+                <p className="text-sm mt-1">
+                  {searchQuery
+                    ? "没有找到匹配的文件"
+                    : selectedBranchId
+                    ? "该分支暂无文件，开始对话后将自动归档"
+                    : "会话中生成的文件将自动归档到对应分支"}
+                </p>
               </div>
             ) : (
-              branchTree.map((node) => renderFolderNode(node))
-            )}
-          </div>
-        </ScrollArea>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header with Breadcrumb */}
-        <div className="px-6 py-4 border-b border-border">
-          <div className="flex items-center justify-between mb-4">
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-sm">
-              <button
-                onClick={() => setSelectedBranchId(null)}
-                className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Home className="w-4 h-4" />
-                <span>{projectName}</span>
-              </button>
-              
-              {breadcrumbPath.map((branch, index) => (
-                <div key={branch.id} className="flex items-center gap-2">
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  <button
-                    onClick={() => setSelectedBranchId(branch.id)}
-                    className={cn(
-                      "flex items-center gap-1.5 transition-colors",
-                      index === breadcrumbPath.length - 1
-                        ? "text-foreground font-medium"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {branch.is_main ? (
-                      <Folder className="w-4 h-4 text-primary" />
-                    ) : (
-                      <Folder className="w-4 h-4 text-amber-500" />
-                    )}
-                    <span>{branch.name}</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* File count */}
-            <div className="text-sm text-muted-foreground">
-              {currentFiles.length} 个文件
-            </div>
-          </div>
-
-          {/* Search */}
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索文件..."
-              className="pl-9 pr-9"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted transition-colors"
-              >
-                <X className="w-3.5 h-3.5 text-muted-foreground" />
-              </button>
+              <div className="p-4 space-y-1">
+                {currentFiles.map((file) => (
+                  <FileListItem
+                    key={file.id}
+                    file={file}
+                    showBranch={viewMode === "all" || !selectedBranchId}
+                    onPreview={() => setPreviewAsset(file)}
+                    onDownload={() => handleDownload(file)}
+                    onNavigate={() => handleNavigate(file)}
+                    onDelete={() => handleDeleteClick(file)}
+                    onBranchClick={() => file.branch_id && handleBranchClick(file.branch_id)}
+                  />
+                ))}
+              </div>
             )}
           </div>
         </div>
-
-        {/* File List */}
-        <ScrollArea className="flex-1">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
-            </div>
-          ) : currentFiles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <FolderOpen className="w-16 h-16 mb-4 opacity-30" />
-              <p className="text-lg font-medium">暂无文件</p>
-              <p className="text-sm mt-1">
-                {searchQuery
-                  ? "没有找到匹配的文件"
-                  : selectedBranchId
-                  ? "该分支暂无文件，开始对话后将自动归档"
-                  : "会话中生成的文件将自动归档到对应分支"}
-              </p>
-            </div>
-          ) : (
-            <div className="p-4 space-y-1">
-              {currentFiles.map((file) => (
-                <FileListItem
-                  key={file.id}
-                  file={file}
-                  showBranch={viewMode === "all" || !selectedBranchId}
-                  onPreview={() => setPreviewAsset(file)}
-                  onDownload={() => handleDownload(file)}
-                  onNavigate={() => handleNavigate(file)}
-                  onDelete={() => handleDeleteClick(file)}
-                  onBranchClick={() => file.branch_id && handleBranchClick(file.branch_id)}
-                />
-              ))}
-            </div>
-          )}
-        </ScrollArea>
       </div>
 
       {/* Delete Confirmation Dialog */}
@@ -668,7 +669,6 @@ const FileCenter = ({
           </div>
         </DialogContent>
       </Dialog>
-      </div>
     </div>
   );
 };
