@@ -1,20 +1,15 @@
-import { FolderKanban, Bot, Workflow, FolderOpen } from "lucide-react";
+import { FolderKanban, Bot, Workflow } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import CurveLogo from "./CurveLogo";
 import UserAvatar from "./UserAvatar";
 
-interface TopNavbarProps {
-  fileUnreadCount?: number;
-}
-
 const navItems = [
   { id: "project", label: "Project", icon: FolderKanban, path: "/" },
-  { id: "files", label: "Files", icon: FolderOpen, path: "/files" },
   { id: "agent", label: "Agent", icon: Bot, path: "/agent" },
   { id: "workflow", label: "Workflow", icon: Workflow, path: "/workflow" },
 ];
 
-const TopNavbar = ({ fileUnreadCount = 0 }: TopNavbarProps) => {
+const TopNavbar = () => {
   return (
     <header className="h-14 bg-card border-b border-border flex items-center justify-between px-4 flex-shrink-0">
       {/* Left: Logo */}
@@ -33,11 +28,6 @@ const TopNavbar = ({ fileUnreadCount = 0 }: TopNavbarProps) => {
           >
             <item.icon className="w-4 h-4" />
             <span>{item.label}</span>
-            {item.id === "files" && fileUnreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-destructive text-destructive-foreground text-[10px] font-semibold rounded-full flex items-center justify-center">
-                {fileUnreadCount > 99 ? "99+" : fileUnreadCount}
-              </span>
-            )}
           </NavLink>
         ))}
       </nav>

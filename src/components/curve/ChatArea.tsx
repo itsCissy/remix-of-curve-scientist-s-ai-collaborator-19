@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import ChatHeader from "./ChatHeader";
 import UserMessage from "./UserMessage";
 import AgentMessage from "./AgentMessage";
@@ -7,13 +8,14 @@ import AgentSwitchDialog from "./AgentSwitchDialog";
 import BranchTreeView from "./BranchTreeView";
 import CreateBranchDialog from "./CreateBranchDialog";
 import MergeBranchDialog from "./MergeBranchDialog";
+import FileCenter from "./FileCenter";
 import { Message as LocalMessage, parseMessageContent, generateId } from "@/lib/messageUtils";
 import { Agent, DEFAULT_AGENT } from "@/lib/agents";
 import { useToast } from "@/hooks/use-toast";
 import { useMessages } from "@/hooks/useProjects";
 import { useBranches, useCollaborator } from "@/hooks/useBranches";
+import { useFileAssets, extractFilesFromContent, detectCategory } from "@/hooks/useFileAssets";
 import { supabase } from "@/integrations/supabase/client";
-import { extractFilesFromContent, detectCategory } from "@/hooks/useFileAssets";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
@@ -23,6 +25,7 @@ interface ChatAreaProps {
 }
 
 const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
+  const navigate = useNavigate();
   const { messages: dbMessages, addMessage, clearMessages, isLoading: messagesLoading } = useMessages(projectId);
   const { 
     branches, 
@@ -35,6 +38,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
     renameBranch,
   } = useBranches(projectId);
   const { collaborator, allCollaborators, ensureCollaborator } = useCollaborator(projectId);
+  const { assets, isLoading: assetsLoading, deleteAsset, unreadCount, resetUnreadCount } = useFileAssets(projectId);
   
   const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +46,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
   const [pendingAgent, setPendingAgent] = useState<Agent | null>(null);
   const [showSwitchDialog, setShowSwitchDialog] = useState(false);
   const [showBranchTree, setShowBranchTree] = useState(false);
+  const [showFileCenter, setShowFileCenter] = useState(false);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [mergeBranchId, setMergeBranchId] = useState<string | null>(null);
@@ -494,6 +499,40 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
     }
   };
 
+  // Handle file center navigation
+  const handleNavigateToMessage = useCallback(
+    (messageId: string, branchId: string) => {
+      setShowFileCenter(false);
+      switchBranch(branchId);
+      // TODO: Implement message highlighting
+    },
+    [switchBranch]
+  );
+
+  const handleNavigateToBranch = useCallback(
+    (branchId: string) => {
+      setShowFileCenter(false);
+      switchBranch(branchId);
+    },
+    [switchBranch]
+  );
+
+  // Show file center view
+  if (showFileCenter) {
+    return (
+      <FileCenter
+        assets={assets}
+        branches={branches}
+        isLoading={assetsLoading}
+        projectName={projectName}
+        onDeleteAsset={deleteAsset}
+        onNavigateToMessage={handleNavigateToMessage}
+        onNavigateToBranch={handleNavigateToBranch}
+        onBack={() => setShowFileCenter(false)}
+      />
+    );
+  }
+
   // Show branch tree view
   if (showBranchTree) {
     return (
@@ -533,6 +572,11 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
         currentBranch={currentBranch}
         collaborators={allCollaborators}
         onShowBranchTree={() => setShowBranchTree(true)}
+        onShowFileCenter={() => {
+          resetUnreadCount();
+          setShowFileCenter(true);
+        }}
+        fileUnreadCount={unreadCount}
       />
 
       <div className="flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
