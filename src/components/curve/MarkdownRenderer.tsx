@@ -88,31 +88,38 @@ const CSVTable = ({ data }: CSVTableProps) => {
     return nameMap[key.toLowerCase()] || key;
   };
 
-  // Check if column needs width limit
-  const isLongTextColumn = (key: string) => {
-    const longTextColumns = ['molecule_name', 'smiles', 'reported_target', 'name', 'description'];
-    return longTextColumns.some(col => key.toLowerCase().includes(col));
+  // Check if SMILES column
+  const isSmilesColumn = (key: string) => {
+    return key.toLowerCase() === 'smiles';
   };
 
-  // Check if column should not wrap
+  // Check if column should not wrap (ID columns)
   const isIdColumn = (key: string) => {
-    const idColumns = ['id', 'chembl_id', 'target_id'];
-    return idColumns.some(col => key.toLowerCase().includes(col));
+    const idColumns = ['id', 'chembl_id', 'target_id', 'reported_target_id'];
+    return idColumns.some(col => key.toLowerCase() === col || key.toLowerCase().endsWith('_id'));
+  };
+
+  // Get column min-width based on type
+  const getColumnMinWidth = (key: string) => {
+    if (isSmilesColumn(key)) return 'min-w-[300px]';
+    if (isIdColumn(key)) return 'min-w-[120px]';
+    if (key.toLowerCase().includes('name') || key.toLowerCase().includes('target')) return 'min-w-[180px]';
+    return 'min-w-[100px]';
   };
 
   return (
-    <div className="my-4 overflow-x-auto rounded-lg border-2 border-slate-200 dark:border-slate-700 shadow-sm">
-      <table className="w-full border-collapse text-sm table-fixed">
+    <div className="my-4 w-full overflow-x-auto rounded-lg border-2 border-slate-200 dark:border-slate-700 shadow-sm">
+      <table className="table-auto border-collapse text-sm min-w-[1200px]">
         <thead className="bg-slate-100 dark:bg-slate-800/80">
           <tr>
-            {allKeys.map((key, idx) => (
+            {allKeys.map((key) => (
               <th 
                 key={key} 
                 className={cn(
-                  "px-4 py-3 text-left font-semibold text-foreground border-b-2 border-slate-300 dark:border-slate-600",
-                  isIdColumn(key) && "whitespace-nowrap w-[150px]",
-                  isLongTextColumn(key) && "max-w-[250px] min-w-[150px]",
-                  idx < allKeys.length - 1 && "border-r border-slate-200 dark:border-slate-700"
+                  "px-4 py-3 text-left font-semibold text-foreground whitespace-nowrap",
+                  "border-b-2 border-r border-slate-300 dark:border-slate-600",
+                  "last:border-r-0",
+                  getColumnMinWidth(key)
                 )}
               >
                 {formatHeader(key)}
@@ -120,33 +127,41 @@ const CSVTable = ({ data }: CSVTableProps) => {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+        <tbody>
           {data.map((row, idx) => (
             <tr 
               key={idx} 
               className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors"
             >
-              {allKeys.map((key, colIdx) => (
+              {allKeys.map((key) => (
                 <td 
                   key={key} 
                   className={cn(
-                    "px-4 py-3 text-foreground",
-                    isIdColumn(key) && "whitespace-nowrap font-medium",
-                    colIdx < allKeys.length - 1 && "border-r border-slate-200 dark:border-slate-700"
+                    "px-4 py-3 text-left text-foreground",
+                    "border-b border-r border-slate-200 dark:border-slate-700",
+                    "last:border-r-0",
+                    getColumnMinWidth(key),
+                    isIdColumn(key) && "whitespace-nowrap font-medium"
                   )}
                 >
-                  {isLongTextColumn(key) ? (
+                  {isSmilesColumn(key) ? (
                     <span 
-                      className={cn(
-                        "block truncate max-w-[250px]",
-                        key.toLowerCase().includes('smiles') && "font-mono text-xs text-muted-foreground"
-                      )} 
+                      className="block font-mono text-xs text-muted-foreground truncate max-w-[400px]"
                       title={String(row[key] ?? '')}
                     >
                       {row[key] ?? '-'}
                     </span>
                   ) : (
-                    <span>{row[key] ?? '-'}</span>
+                    <span 
+                      className={cn(
+                        key.toLowerCase().includes('name') || key.toLowerCase().includes('target') 
+                          ? "block truncate max-w-[250px]" 
+                          : ""
+                      )}
+                      title={String(row[key] ?? '')}
+                    >
+                      {row[key] ?? '-'}
+                    </span>
                   )}
                 </td>
               ))}
