@@ -107,6 +107,70 @@ export type Database = {
           },
         ]
       }
+      file_assets: {
+        Row: {
+          branch_id: string | null
+          category: string
+          content: string | null
+          created_at: string
+          id: string
+          message_id: string | null
+          name: string
+          project_id: string
+          size: string | null
+          type: string
+          url: string | null
+        }
+        Insert: {
+          branch_id?: string | null
+          category?: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          name: string
+          project_id: string
+          size?: string | null
+          type?: string
+          url?: string | null
+        }
+        Update: {
+          branch_id?: string | null
+          category?: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          name?: string
+          project_id?: string
+          size?: string | null
+          type?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_assets_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_assets_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           agent_id: string | null
