@@ -244,11 +244,11 @@ const MoleculeEditorDialog = ({ open, onOpenChange, onExport, initialSmiles }: M
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0">
         {/* Header */}
-        <DialogHeader className="px-4 py-3 border-b border-border flex-shrink-0 bg-gradient-to-r from-violet-500/10 to-purple-500/10">
+        <DialogHeader className="px-4 py-3 border-b border-border flex-shrink-0 bg-gradient-to-r from-primary/10 to-accent/10">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2 text-lg">
-              <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                <svg className="w-5 h-5 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="8" cy="8" r="2.5" />
                   <circle cx="16" cy="8" r="2.5" />
                   <circle cx="12" cy="15" r="2.5" />

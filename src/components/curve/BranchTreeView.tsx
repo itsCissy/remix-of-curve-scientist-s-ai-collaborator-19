@@ -616,11 +616,11 @@ const BranchTreeView = ({
           style={{ width: maxX, height: maxY }}
         >
           <defs>
-            {/* Main branch gradient */}
+            {/* Main branch gradient - XtalPi Blue gradient */}
             <linearGradient id="mainConnectionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
-              <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.2" />
+              <stop offset="0%" stopColor="#1609a0" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#123aff" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#00ffff" stopOpacity="0.4" />
             </linearGradient>
             
             {/* Normal branch gradient */}
@@ -630,9 +630,9 @@ const BranchTreeView = ({
               <stop offset="100%" stopColor="hsl(var(--border))" stopOpacity="0.3" />
             </linearGradient>
 
-            {/* Flow animation pattern */}
+            {/* Flow animation pattern - XtalPi Blue */}
             <pattern id="flowPattern" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform={`translate(${-animationOffset * 2}, 0)`}>
-              <circle cx="2" cy="10" r="1.5" fill="hsl(var(--primary))" opacity="0.8" />
+              <circle cx="2" cy="10" r="1.5" fill="#00ffff" opacity="0.8" />
             </pattern>
           </defs>
           
@@ -642,13 +642,13 @@ const BranchTreeView = ({
             
             return (
               <g key={idx}>
-                {/* Glow effect */}
+                {/* Glow effect - XtalPi Blue */}
                 <path
                   d={path}
                   fill="none"
-                  stroke={conn.isMain ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"}
+                  stroke={conn.isMain ? "#123aff" : "hsl(var(--muted-foreground))"}
                   strokeWidth="8"
-                  opacity="0.1"
+                  opacity="0.15"
                   strokeLinecap="round"
                 />
                 
@@ -673,13 +673,13 @@ const BranchTreeView = ({
                   />
                 )}
                 
-                {/* End dot */}
+                {/* End dot - XtalPi Blue */}
                 <circle 
                   cx={conn.toX} 
                   cy={conn.toY} 
                   r="5" 
-                  fill={conn.isMain ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"} 
-                  opacity="0.5"
+                  fill={conn.isMain ? "#00ffff" : "hsl(var(--muted-foreground))"} 
+                  opacity="0.7"
                 />
               </g>
             );

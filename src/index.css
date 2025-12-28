@@ -6,7 +6,15 @@
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
+    /* XtalPi Brand Colors - converted to HSL */
+    /* XtalPi Blue: #123aff = hsl(228, 100%, 54%) */
+    /* XtalPi Green: #00ff9a = hsl(156, 100%, 50%) */
+    /* Blue gradient start #1609a0 = hsl(243, 91%, 33%) */
+    /* Blue gradient end #00ffff = hsl(180, 100%, 50%) */
+    /* Green gradient start #00a29c = hsl(177, 100%, 32%) */
+    /* Green gradient end #00ffd4 = hsl(170, 100%, 50%) */
+
+    --background: 210 20% 98%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -15,48 +23,74 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 228 76% 59%;
+    /* Primary - XtalPi Blue #123aff */
+    --primary: 228 100% 54%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 96%;
+    /* Secondary - Light blue-tinted gray */
+    --secondary: 214 32% 96%;
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    /* Muted - Blue-tinted gray */
+    --muted: 214 20% 94%;
+    --muted-foreground: 220 13% 46%;
 
-    --accent: 228 76% 59%;
-    --accent-foreground: 0 0% 100%;
+    /* Accent - XtalPi Green #00ff9a */
+    --accent: 156 100% 50%;
+    --accent-foreground: 222 47% 11%;
+
+    /* Success - XtalPi Green for scientific/success states */
+    --success: 156 100% 50%;
+    --success-foreground: 222 47% 11%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 228 76% 59%;
+    /* Border - Blue-tinted gray */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 228 100% 54%;
 
     --radius: 0.75rem;
+
+    /* XtalPi Gradient Colors */
+    --gradient-blue-start: 243 91% 33%;
+    --gradient-blue-end: 180 100% 50%;
+    --gradient-green-start: 177 100% 32%;
+    --gradient-green-end: 170 100% 50%;
 
     /* Custom Curve tokens */
     --sidebar-width: 280px;
     --sidebar-bg: 0 0% 100%;
-    --sidebar-border: 220 13% 93%;
-    --message-user-bg: 228 76% 59%;
+    --sidebar-border: 214 32% 93%;
+    --message-user-bg: 228 100% 54%;
     --message-agent-bg: 0 0% 100%;
     --input-bg: 0 0% 100%;
-    --hover-bg: 220 14% 96%;
+    --hover-bg: 214 20% 96%;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 9% 46%;
-    --sidebar-primary: 228 76% 59%;
+    --sidebar-foreground: 220 13% 46%;
+    --sidebar-primary: 228 100% 54%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent: 214 20% 96%;
     --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 220 13% 93%;
-    --sidebar-ring: 228 76% 59%;
+    --sidebar-border: 214 32% 93%;
+    --sidebar-ring: 228 100% 54%;
+
+    /* Scientific/Agent success state */
+    --agent-success: 156 100% 50%;
+    --agent-success-foreground: 222 47% 11%;
+
+    /* Chart colors - XtalPi palette */
+    --chart-1: 228 100% 54%;
+    --chart-2: 156 100% 50%;
+    --chart-3: 180 100% 50%;
+    --chart-4: 170 100% 50%;
+    --chart-5: 243 91% 33%;
   }
 
   .dark {
-    --background: 222 47% 11%;
+    --background: 222 47% 8%;
     --foreground: 210 40% 98%;
 
     --card: 222 47% 11%;
@@ -65,40 +99,57 @@
     --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 228 76% 59%;
+    /* Primary - XtalPi Blue */
+    --primary: 228 100% 60%;
     --primary-foreground: 0 0% 100%;
 
+    /* Secondary */
     --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;
 
+    /* Muted */
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
+    /* Accent - XtalPi Green */
+    --accent: 156 100% 50%;
+    --accent-foreground: 222 47% 11%;
 
-    --destructive: 0 63% 31%;
+    /* Success - XtalPi Green */
+    --success: 156 100% 50%;
+    --success-foreground: 222 47% 11%;
+
+    --destructive: 0 63% 40%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 212 27% 84%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 228 100% 60%;
 
     --sidebar-bg: 222 47% 11%;
-    --sidebar-border: 217 33% 17%;
-    --message-user-bg: 228 76% 59%;
+    --sidebar-border: 217 33% 20%;
+    --message-user-bg: 228 100% 54%;
     --message-agent-bg: 217 33% 17%;
     --input-bg: 217 33% 17%;
-    --hover-bg: 217 33% 17%;
+    --hover-bg: 217 33% 20%;
 
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 215 20% 65%;
-    --sidebar-primary: 228 76% 59%;
+    --sidebar-primary: 228 100% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent: 217 33% 20%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 228 76% 59%;
+    --sidebar-border: 217 33% 20%;
+    --sidebar-ring: 228 100% 60%;
+
+    --agent-success: 156 100% 50%;
+    --agent-success-foreground: 222 47% 11%;
+
+    --chart-1: 228 100% 60%;
+    --chart-2: 156 100% 50%;
+    --chart-3: 180 100% 50%;
+    --chart-4: 170 100% 50%;
+    --chart-5: 243 91% 45%;
   }
 }
 
@@ -131,6 +182,31 @@
     border-radius: 3px;
   }
 
+  /* XtalPi Blue Gradient - for actions and primary elements */
+  .gradient-xtalpi-blue {
+    background: linear-gradient(90deg, hsl(var(--gradient-blue-start)), hsl(var(--gradient-blue-end)));
+  }
+
+  /* XtalPi Green Gradient - for scientific and success states */
+  .gradient-xtalpi-green {
+    background: linear-gradient(90deg, hsl(var(--gradient-green-start)), hsl(var(--gradient-green-end)));
+  }
+
+  /* Gradient text utility */
+  .text-gradient-blue {
+    background: linear-gradient(90deg, hsl(var(--gradient-blue-start)), hsl(var(--gradient-blue-end)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-green {
+    background: linear-gradient(90deg, hsl(var(--gradient-green-start)), hsl(var(--gradient-green-end)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
   /* Shimmer animation for progress bars */
   @keyframes shimmer {
     0% {
@@ -159,5 +235,14 @@
 
   .animate-thinking-bar {
     animation: thinking-bar 2s ease-in-out infinite;
+  }
+
+  /* Glow effects for XtalPi colors */
+  .glow-blue {
+    box-shadow: 0 0 20px hsl(228 100% 54% / 0.3);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 20px hsl(156 100% 50% / 0.3);
   }
 }

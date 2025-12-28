@@ -37,10 +37,10 @@ interface ProjectTemplate {
 }
 
 const availableAgents = [
-  { id: "xtalpi", name: "Xtalpi Agent", description: "通用科学分析", color: "from-blue-500 to-cyan-500" },
-  { id: "molecule", name: "Molecule Agent", description: "分子结构分析", color: "from-purple-500 to-pink-500" },
-  { id: "crystal", name: "Crystal Agent", description: "晶体结构预测", color: "from-amber-500 to-orange-500" },
-  { id: "synthesis", name: "Synthesis Agent", description: "合成路线设计", color: "from-green-500 to-emerald-500" },
+  { id: "xtalpi", name: "Xtalpi Agent", description: "通用科学分析", color: "from-xtalpi-blue-dark to-xtalpi-cyan" },
+  { id: "molecule", name: "Molecule Agent", description: "分子结构分析", color: "from-xtalpi-blue to-xtalpi-cyan" },
+  { id: "crystal", name: "Crystal Agent", description: "晶体结构预测", color: "from-xtalpi-green-dark to-xtalpi-green" },
+  { id: "synthesis", name: "Synthesis Agent", description: "合成路线设计", color: "from-xtalpi-green-dark to-xtalpi-teal" },
 ];
 
 const projectTemplates: ProjectTemplate[] = [
