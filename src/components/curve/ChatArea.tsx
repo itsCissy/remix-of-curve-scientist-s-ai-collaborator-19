@@ -520,16 +520,18 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
   // Show file center view
   if (showFileCenter) {
     return (
-      <FileCenter
-        assets={assets}
-        branches={branches}
-        isLoading={assetsLoading}
-        projectName={projectName}
-        onDeleteAsset={deleteAsset}
-        onNavigateToMessage={handleNavigateToMessage}
-        onNavigateToBranch={handleNavigateToBranch}
-        onBack={() => setShowFileCenter(false)}
-      />
+      <div className="h-screen flex flex-col bg-background overflow-hidden">
+        <FileCenter
+          assets={assets}
+          branches={branches}
+          isLoading={assetsLoading}
+          projectName={projectName}
+          onDeleteAsset={deleteAsset}
+          onNavigateToMessage={handleNavigateToMessage}
+          onNavigateToBranch={handleNavigateToBranch}
+          onBack={() => setShowFileCenter(false)}
+        />
+      </div>
     );
   }
 
