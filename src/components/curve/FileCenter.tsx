@@ -414,10 +414,10 @@ const FileCenter = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-background overflow-hidden min-h-0">
+    <div className="h-full w-full flex flex-col bg-background overflow-hidden">
       {/* Top Header with Back Button */}
       {onBack && (
-        <div className="flex-shrink-0 flex items-center gap-3 px-6 py-4 border-b border-border bg-card/50">
+        <div className="flex-shrink-0 flex items-center gap-3 px-6 py-4 border-b border-border bg-card">
           <button
             onClick={onBack}
             className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors font-medium"
@@ -433,9 +433,9 @@ const FileCenter = ({
         </div>
       )}
 
-      <div className="flex-1 flex flex-row min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-row w-full min-h-0 overflow-hidden">
         {/* Left Sidebar - Folder Tree */}
-        <div className="w-64 lg:w-72 flex-shrink-0 border-r border-border flex flex-col bg-card/50 h-full">
+        <div className="w-72 flex-shrink-0 h-full border-r border-border flex flex-col bg-card">
           <div className="flex-shrink-0 p-4 border-b border-border">
             {!onBack && (
               <div className="flex items-center gap-2 mb-3">
@@ -489,10 +489,10 @@ const FileCenter = ({
           </ScrollArea>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-muted/30">
+        {/* Main Content - fills remaining width */}
+        <div className="flex-1 h-full flex flex-col bg-muted/20 overflow-hidden">
           {/* Header with Breadcrumb */}
-          <div className="flex-shrink-0 px-6 py-4 border-b border-border bg-background">
+          <div className="flex-shrink-0 px-6 py-4 border-b border-border bg-card">
             <div className="flex items-center justify-between mb-4">
               {/* Breadcrumb */}
               <div className="flex items-center gap-2 text-sm">
@@ -553,17 +553,17 @@ const FileCenter = ({
             </div>
           </div>
 
-          {/* File List */}
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          {/* File List - fills remaining height */}
+          <div className="flex-1 w-full overflow-y-auto">
             {isLoading ? (
-              <div className="h-full flex items-center justify-center">
+              <div className="h-full w-full flex items-center justify-center">
                 <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
               </div>
             ) : currentFiles.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+              <div className="h-full w-full flex flex-col items-center justify-center text-muted-foreground px-4">
                 <FolderOpen className="w-16 h-16 mb-4 opacity-30" />
                 <p className="text-lg font-medium">暂无文件</p>
-                <p className="text-sm mt-1">
+                <p className="text-sm mt-1 text-center">
                   {searchQuery
                     ? "没有找到匹配的文件"
                     : selectedBranchId
