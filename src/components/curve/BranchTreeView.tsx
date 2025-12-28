@@ -707,20 +707,7 @@ const BranchTreeView = ({
             返回对话
           </Button>
           <div className="h-5 w-px bg-border" />
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <GitBranch className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-base font-semibold text-foreground">分支视图</h1>
-              <p className="text-xs text-muted-foreground">{branches.length} 个会话分支</p>
-            </div>
-          </div>
-        </div>
-        
-        {/* Right side controls */}
-        <div className="flex items-center gap-3">
-          {/* File Center button - consistent with ChatHeader style */}
+          {/* File Center button - moved to left side */}
           {onShowFileCenter && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -740,8 +727,20 @@ const BranchTreeView = ({
               <TooltipContent>查看文件夹</TooltipContent>
             </Tooltip>
           )}
-          
           <div className="h-5 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <GitBranch className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-base font-semibold text-foreground">分支视图</h1>
+              <p className="text-xs text-muted-foreground">{branches.length} 个会话分支</p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Right side controls */}
+        <div className="flex items-center gap-3">
           
           {/* Zoom controls */}
           <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 border border-border/30">
