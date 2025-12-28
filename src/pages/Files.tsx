@@ -5,6 +5,7 @@ import TopNavbar from "@/components/curve/TopNavbar";
 import FileCenter from "@/components/curve/FileCenter";
 import { useProjects } from "@/hooks/useProjects";
 import { useFileAssets } from "@/hooks/useFileAssets";
+import { useBranches } from "@/hooks/useBranches";
 
 const Files = () => {
   const navigate = useNavigate();
@@ -25,6 +26,8 @@ const Files = () => {
     resetUnreadCount,
   } = useFileAssets(activeProject?.id || null);
 
+  const { branches } = useBranches(activeProject?.id || null);
+
   // Reset unread count when viewing file center
   useEffect(() => {
     resetUnreadCount();
@@ -34,6 +37,13 @@ const Files = () => {
     (messageId: string, branchId: string) => {
       // Navigate to the main page with the message highlight info
       navigate(`/?branch=${branchId}&message=${messageId}&highlight=true`);
+    },
+    [navigate]
+  );
+
+  const handleNavigateToBranch = useCallback(
+    (branchId: string) => {
+      navigate(`/?branch=${branchId}`);
     },
     [navigate]
   );
@@ -64,9 +74,12 @@ const Files = () => {
         <div className="flex-1 overflow-hidden">
           <FileCenter
             assets={assets}
+            branches={branches}
             isLoading={assetsLoading}
+            projectName={activeProject?.name}
             onDeleteAsset={deleteAsset}
             onNavigateToMessage={handleNavigateToMessage}
+            onNavigateToBranch={handleNavigateToBranch}
           />
         </div>
       </div>
