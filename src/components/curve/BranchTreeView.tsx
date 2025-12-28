@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Branch, Collaborator } from "@/hooks/useBranches";
-import { GitBranch, MessageSquare, Trash2, ArrowLeft, ZoomIn, ZoomOut, Maximize2, Plus, Clock, Sparkles, AlertTriangle, MoreHorizontal, Pencil, Copy } from "lucide-react";
+import { GitBranch, MessageSquare, Trash2, ArrowLeft, ZoomIn, ZoomOut, Maximize2, Plus, Clock, Sparkles, AlertTriangle, MoreHorizontal, Pencil, Copy, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,6 +58,8 @@ interface BranchTreeViewProps {
   messageCountByBranch?: Record<string, number>;
   messagesByBranch?: Record<string, { content: string; role: string }[]>;
   onCreateBranch?: (parentBranchId: string, name: string, inheritContext: boolean) => void;
+  onShowFileCenter?: () => void;
+  fileUnreadCount?: number;
 }
 
 const BranchTreeView = ({
@@ -73,6 +75,8 @@ const BranchTreeView = ({
   messageCountByBranch = {},
   messagesByBranch = {},
   onCreateBranch,
+  onShowFileCenter,
+  fileUnreadCount = 0,
 }: BranchTreeViewProps) => {
   // Canvas pan and zoom state
   const [scale, setScale] = useState(0.85);
@@ -714,8 +718,34 @@ const BranchTreeView = ({
           </div>
         </div>
         
-        {/* Zoom controls */}
-        <div className="flex items-center gap-2">
+        {/* Right side controls */}
+        <div className="flex items-center gap-3">
+          {/* File Center button */}
+          {onShowFileCenter && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onShowFileCenter}
+                  className="gap-2 text-muted-foreground hover:text-foreground relative"
+                >
+                  <Folder className="w-4 h-4" />
+                  文件中心
+                  {fileUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] rounded-full flex items-center justify-center">
+                      {fileUnreadCount > 9 ? '9+' : fileUnreadCount}
+                    </span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>查看项目文件</TooltipContent>
+            </Tooltip>
+          )}
+          
+          <div className="h-5 w-px bg-border" />
+          
+          {/* Zoom controls */}
           <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 border border-border/30">
             <Tooltip>
               <TooltipTrigger asChild>

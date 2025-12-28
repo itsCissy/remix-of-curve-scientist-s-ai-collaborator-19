@@ -762,6 +762,12 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
           messageCountByBranch={messageCountByBranch}
           messagesByBranch={messagesByBranch}
           onCreateBranch={handleCreateBranchFromView}
+          onShowFileCenter={() => {
+            resetUnreadCount();
+            setShowBranchTree(false);
+            setShowFileCenter(true);
+          }}
+          fileUnreadCount={unreadCount}
         />
         <MergeBranchDialog
           open={showMergeDialog}
