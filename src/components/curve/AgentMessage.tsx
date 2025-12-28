@@ -40,6 +40,7 @@ const AgentMessage = ({
           normalContent={parsed.normalContent}
           isStreaming={isStreaming}
           files={allFiles.length > 0 ? allFiles : undefined}
+          moleculeData={parsed.moleculeData}
         />
       </div>
       {/* Branch button */}

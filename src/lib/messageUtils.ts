@@ -1,4 +1,5 @@
 import { detectFileType, FileAttachment } from "@/components/curve/FileViewer";
+import { detectMoleculeData, ParsedMoleculeResult } from "./moleculeDataUtils";
 
 export interface MessageAttachment {
   name: string;
@@ -24,6 +25,7 @@ export interface ParsedContent {
   conclusion?: string;
   normalContent: string;
   files?: FileAttachment[];
+  moleculeData?: ParsedMoleculeResult;
 }
 
 export function parseMessageContent(content: string): ParsedContent {
@@ -73,12 +75,19 @@ export function parseMessageContent(content: string): ParsedContent {
     result.files = files;
   }
 
+  // Detect molecule data
+  const moleculeData = detectMoleculeData(content);
+  if (moleculeData) {
+    result.moleculeData = moleculeData;
+  }
+
   // Get normal content (remove all tags)
   let normalContent = content
     .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
     .replace(/<tools>[\s\S]*?<\/tools>/g, '')
     .replace(/<conclusion>[\s\S]*?<\/conclusion>/g, '')
     .replace(/<file\s+[^>]*>[\s\S]*?<\/file>/g, '')
+    .replace(/<molecule-data[^>]*>[\s\S]*?<\/molecule-data>/g, '')
     .trim();
 
   result.normalContent = normalContent;
