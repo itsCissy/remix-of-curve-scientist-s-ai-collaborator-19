@@ -3,7 +3,8 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Copy, Check } from "lucide-react";
-import { useState, useCallback, ReactNode, Fragment, useMemo } from "react";
+import { useState, useCallback, ReactNode, Fragment, useMemo, useEffect, useRef } from "react";
+import React from "react";
 import { cn } from "@/lib/utils";
 import SmilesHighlight, { isValidSmiles } from "./SmilesHighlight";
 import { parseCSVData, MoleculeData } from "@/lib/moleculeDataUtils";
@@ -44,12 +45,108 @@ const isMoleculeCSV = (content: string): boolean => {
   return moleculeHeaders.some(h => firstLine.includes(h));
 };
 
+// Archive animation component
+const ArchiveAnimation = ({ tableRef }: { tableRef: React.RefObject<HTMLDivElement> }) => {
+  const [isAnimating, setIsAnimating] = useState(false);
+  const folderIconRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!tableRef.current) return;
+
+    // 查找文件夹图标
+    const findFolderIcon = () => {
+      const folderButton = document.querySelector('[data-folder-icon]') as HTMLElement;
+      return folderButton?.querySelector('svg') as HTMLElement;
+    };
+
+    const triggerAnimation = () => {
+      setIsAnimating(true);
+      folderIconRef.current = findFolderIcon();
+
+      // 创建飞入的像素点
+      const pixel = document.createElement('div');
+      pixel.style.cssText = `
+        position: fixed;
+        width: 4px;
+        height: 4px;
+        background: #123aff;
+        border-radius: 50%;
+        z-index: 9999;
+        pointer-events: none;
+      `;
+
+        const tableRect = tableRef.current!.getBoundingClientRect();
+        // 校准为无框表格的右上角
+        const startX = tableRect.right - 10;
+        const startY = tableRect.top + 10;
+
+      if (folderIconRef.current) {
+        const folderRect = folderIconRef.current.getBoundingClientRect();
+        const endX = folderRect.left + folderRect.width / 2;
+        const endY = folderRect.top + folderRect.height / 2;
+
+        pixel.style.left = `${startX}px`;
+        pixel.style.top = `${startY}px`;
+        document.body.appendChild(pixel);
+
+        // 抛物线动画
+        const duration = 800;
+        const startTime = Date.now();
+
+        const animate = () => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // 抛物线路径
+          const currentX = startX + (endX - startX) * progress;
+          const currentY = startY + (endY - startY) * progress - 100 * Math.sin(progress * Math.PI);
+
+          pixel.style.left = `${currentX}px`;
+          pixel.style.top = `${currentY}px`;
+          pixel.style.opacity = String(1 - progress);
+
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            pixel.remove();
+            // 激活文件夹图标
+            if (folderIconRef.current) {
+              folderIconRef.current.style.color = '#123aff';
+              const button = folderIconRef.current.closest('button');
+              if (button) {
+                button.style.color = '#123aff';
+                button.style.backgroundColor = 'rgba(18, 58, 255, 0.08)';
+                button.classList.add('animate-ping');
+                setTimeout(() => {
+                  button.classList.remove('animate-ping');
+                  button.classList.add('animate-pulse');
+                }, 1000);
+              }
+            }
+            setIsAnimating(false);
+          }
+        };
+
+        requestAnimationFrame(animate);
+      }
+    };
+
+    // 延迟触发动画，确保表格已渲染
+    const timer = setTimeout(triggerAnimation, 300);
+    return () => clearTimeout(timer);
+  }, [tableRef]);
+
+  return null;
+};
+
 // Simple CSV Table component
 interface CSVTableProps {
   data: MoleculeData[];
 }
 
 const CSVTable = ({ data }: CSVTableProps) => {
+  const tableRef = useRef<HTMLDivElement>(null);
+
   if (data.length === 0) return null;
 
   // Get all column keys and reorder them
@@ -108,17 +205,18 @@ const CSVTable = ({ data }: CSVTableProps) => {
   };
 
   return (
-    <div className="my-4 w-full overflow-x-auto rounded-lg border-2 border-slate-200 dark:border-slate-700 shadow-sm">
-      <table className="table-auto border-collapse text-sm min-w-[1200px]">
-        <thead className="bg-slate-100 dark:bg-slate-800/80">
+    <>
+      <ArchiveAnimation tableRef={tableRef} />
+      <div ref={tableRef} className="my-4 w-full overflow-x-auto">
+        <table className="table-auto border-collapse text-sm min-w-[1200px]">
+        <thead className="bg-slate-50 dark:bg-slate-800/80">
           <tr>
             {allKeys.map((key) => (
               <th 
                 key={key} 
                 className={cn(
                   "px-4 py-3 text-left font-semibold text-foreground whitespace-nowrap",
-                  "border-b-2 border-r border-slate-300 dark:border-slate-600",
-                  "last:border-r-0",
+                  "border-b border-slate-200 dark:border-slate-700",
                   getColumnMinWidth(key)
                 )}
               >
@@ -131,15 +229,17 @@ const CSVTable = ({ data }: CSVTableProps) => {
           {data.map((row, idx) => (
             <tr 
               key={idx} 
-              className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors"
+              className={cn(
+                "hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors border-b border-slate-200 dark:border-slate-700",
+                idx % 2 === 0 && "bg-[#f8fafc] dark:bg-slate-900/50"
+              )}
             >
               {allKeys.map((key) => (
                 <td 
                   key={key} 
                   className={cn(
                     "px-4 py-3 text-left text-foreground",
-                    "border-b border-r border-slate-200 dark:border-slate-700",
-                    "last:border-r-0",
+                    "border-b border-slate-200 dark:border-slate-700",
                     getColumnMinWidth(key),
                     isIdColumn(key) && "whitespace-nowrap font-medium"
                   )}
@@ -169,7 +269,8 @@ const CSVTable = ({ data }: CSVTableProps) => {
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 };
 
@@ -307,30 +408,35 @@ const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) => {
           },
           table({ children }) {
             return (
-              <div className="my-4 overflow-x-auto rounded-lg border border-border/50">
+              <div className="my-4 overflow-x-auto">
                 <table className="w-full border-collapse text-sm">{children}</table>
               </div>
             );
           },
           thead({ children }) {
-            return <thead className="bg-muted/50">{children}</thead>;
+            return <thead className="bg-slate-50 dark:bg-slate-800/80">{children}</thead>;
           },
           th({ children }) {
             return (
-              <th className="px-4 py-2.5 text-left font-semibold text-foreground border-b border-border/50">
+              <th className="px-4 py-2.5 text-left font-semibold text-foreground border-b-2 border-slate-200 dark:border-slate-700">
                 {children}
               </th>
             );
           },
           td({ children }) {
             return (
-              <td className="px-4 py-2.5 text-foreground border-b border-border/30">
+              <td className="px-4 py-2.5 text-foreground border-b border-slate-200 dark:border-slate-700">
                 {children}
               </td>
             );
           },
           tr({ children }) {
-            return <tr className="hover:bg-muted/30 transition-colors">{children}</tr>;
+            // 斑马纹通过 CSS nth-child 实现
+            return (
+              <tr className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors [&:nth-child(even)]:bg-[#f8fafc] dark:[&:nth-child(even)]:bg-slate-900/50">
+                {children}
+              </tr>
+            );
           },
           ul({ children }) {
             return <ul className="my-2 ml-4 list-disc space-y-1.5 marker:text-primary">{children}</ul>;
@@ -345,12 +451,30 @@ const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) => {
             return <h1 className="text-xl font-bold mt-6 mb-3 text-foreground">{children}</h1>;
           },
           h2({ children }) {
-            return <h2 className="text-lg font-semibold mt-5 mb-2 text-foreground">{children}</h2>;
+            return (
+              <h2 className="text-lg font-semibold mt-5 mb-2 text-foreground pl-3 border-l-4" style={{ borderColor: '#123aff' }}>
+                {children}
+              </h2>
+            );
           },
           h3({ children }) {
             return <h3 className="text-base font-semibold mt-4 mb-2 text-foreground">{children}</h3>;
           },
           p({ children }) {
+            // 处理文本中的分子关键词高亮
+            const processText = (text: string) => {
+              const keywords = ['MW', 'SMILES', 'LogP', 'HBD', 'HBA', 'TPSA', 'Molecular Weight', 'molecular weight'];
+              let processed = text;
+              keywords.forEach(keyword => {
+                const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+                processed = processed.replace(regex, `<strong style="color: #123aff; font-weight: 600;">${keyword}</strong>`);
+              });
+              return processed;
+            };
+            
+            if (typeof children === 'string') {
+              return <p className="my-2 leading-relaxed text-foreground" dangerouslySetInnerHTML={{ __html: processText(children) }} />;
+            }
             return <p className="my-2 leading-relaxed text-foreground">{children}</p>;
           },
           blockquote({ children }) {

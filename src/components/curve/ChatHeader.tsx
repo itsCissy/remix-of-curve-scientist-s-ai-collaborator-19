@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, GitBranch, Users, UserPlus, FolderOpen } from "lucide-react";
+import { ArrowLeft, GitBranch, Users, UserPlus } from "lucide-react";
 import { Branch, Collaborator } from "@/hooks/useBranches";
 import {
   Tooltip,
@@ -22,8 +22,6 @@ interface ChatHeaderProps {
   currentBranch?: Branch | null;
   collaborators?: Collaborator[];
   onShowBranchTree?: () => void;
-  onShowFileCenter?: () => void;
-  fileUnreadCount?: number;
 }
 
 const ChatHeader = ({
@@ -31,8 +29,6 @@ const ChatHeader = ({
   currentBranch,
   collaborators = [],
   onShowBranchTree,
-  onShowFileCenter,
-  fileUnreadCount = 0,
 }: ChatHeaderProps) => {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
 
@@ -64,25 +60,6 @@ const ChatHeader = ({
           </TooltipContent>
         </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={onShowFileCenter}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-medium relative"
-            >
-              <FolderOpen className="w-4 h-4" />
-              <span>文件夹</span>
-              {fileUnreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 bg-destructive text-destructive-foreground text-[10px] font-semibold rounded-full flex items-center justify-center">
-                  {fileUnreadCount > 99 ? "99+" : fileUnreadCount}
-                </span>
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>查看文件夹</p>
-          </TooltipContent>
-        </Tooltip>
       </div>
 
       {/* Right side - Collaborators */}

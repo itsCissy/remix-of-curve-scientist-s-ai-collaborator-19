@@ -20,17 +20,16 @@ const AgentSelector = ({ selectedAgent, onSelectAgent }: AgentSelectorProps) => 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-curve-hover transition-colors text-sm">
+        <button className="flex items-center gap-2 px-3 h-9 rounded-lg hover:bg-curve-hover transition-colors text-sm group">
           <div
             className={cn(
-              "w-6 h-6 rounded-full flex items-center justify-center text-xs",
-              selectedAgent.color
+              "w-6 h-6 rounded-full flex items-center justify-center text-xs bg-slate-100 group-hover:bg-slate-200 transition-colors"
             )}
           >
             {selectedAgent.icon}
           </div>
-          <span className="text-foreground font-medium">{selectedAgent.name}</span>
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          <span className="text-foreground font-medium group-hover:text-[#123aff] transition-colors">{selectedAgent.name}</span>
+          <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-[#123aff] transition-colors" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
@@ -45,8 +44,7 @@ const AgentSelector = ({ selectedAgent, onSelectAgent }: AgentSelectorProps) => 
           >
             <div
               className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0",
-                agent.color
+                "w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 bg-slate-100"
               )}
             >
               {agent.icon}
@@ -55,7 +53,7 @@ const AgentSelector = ({ selectedAgent, onSelectAgent }: AgentSelectorProps) => 
               <div className="flex items-center gap-2">
                 <span className="font-medium text-foreground">{agent.name}</span>
                 {agent.id === selectedAgent.id && (
-                  <Check className="w-4 h-4 text-primary" />
+                  <Check className="w-4 h-4 text-[#123aff]" />
                 )}
               </div>
               <p className="text-xs text-muted-foreground truncate">

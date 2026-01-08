@@ -36,7 +36,7 @@ const DeleteConfirmDialog = ({
           <AlertDialogDescription className="text-muted-foreground">
             您确定要删除项目 <span className="font-medium text-foreground">"{projectName}"</span> 吗？
             <br />
-            <span className="text-destructive/80 text-sm mt-2 block">
+            <span className="text-sm text-slate-500 mt-2 block">
               此操作不可撤销，项目中的所有数据、对话记录和配置将被永久删除。
             </span>
           </AlertDialogDescription>
@@ -45,7 +45,7 @@ const DeleteConfirmDialog = ({
           <AlertDialogCancel className="px-4">取消</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4"
+            className="px-4"
           >
             确认删除
           </AlertDialogAction>

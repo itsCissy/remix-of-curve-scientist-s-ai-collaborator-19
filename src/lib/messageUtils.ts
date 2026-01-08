@@ -33,14 +33,14 @@ export function parseMessageContent(content: string): ParsedContent {
     normalContent: content,
   };
 
-  // Extract reasoning
-  const reasoningMatch = content.match(/<reasoning>([\s\S]*?)<\/reasoning>/);
+  // Extract reasoning（流式场景下允许缺失闭合标签）
+  const reasoningMatch = content.match(/<reasoning>([\s\S]*?)(?:<\/reasoning>|$)/);
   if (reasoningMatch) {
     result.reasoning = reasoningMatch[1].trim();
   }
 
   // Extract tools
-  const toolsMatch = content.match(/<tools>([\s\S]*?)<\/tools>/);
+  const toolsMatch = content.match(/<tools>([\s\S]*?)(?:<\/tools>|$)/);
   if (toolsMatch) {
     const toolsContent = toolsMatch[1].trim();
     result.tools = toolsContent
@@ -50,7 +50,7 @@ export function parseMessageContent(content: string): ParsedContent {
   }
 
   // Extract conclusion
-  const conclusionMatch = content.match(/<conclusion>([\s\S]*?)<\/conclusion>/);
+  const conclusionMatch = content.match(/<conclusion>([\s\S]*?)(?:<\/conclusion>|$)/);
   if (conclusionMatch) {
     result.conclusion = conclusionMatch[1].trim();
   }
@@ -83,9 +83,9 @@ export function parseMessageContent(content: string): ParsedContent {
 
   // Get normal content (remove all tags)
   let normalContent = content
-    .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
-    .replace(/<tools>[\s\S]*?<\/tools>/g, '')
-    .replace(/<conclusion>[\s\S]*?<\/conclusion>/g, '')
+    .replace(/<reasoning>[\s\S]*?(?:<\/reasoning>|$)/g, '')
+    .replace(/<tools>[\s\S]*?(?:<\/tools>|$)/g, '')
+    .replace(/<conclusion>[\s\S]*?(?:<\/conclusion>|$)/g, '')
     .replace(/<file\s+[^>]*>[\s\S]*?<\/file>/g, '')
     .replace(/<molecule-data[^>]*>[\s\S]*?<\/molecule-data>/g, '')
     .trim();

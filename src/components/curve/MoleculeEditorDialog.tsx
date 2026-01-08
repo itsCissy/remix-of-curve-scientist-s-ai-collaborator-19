@@ -427,7 +427,11 @@ const MoleculeEditorDialog = ({ open, onOpenChange, onExport, initialSmiles }: M
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Button variant="outline" onClick={handleClose}>
+              <Button
+                variant="outline"
+                className="bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+                onClick={handleClose}
+              >
                 取消
               </Button>
               <Button 

@@ -76,7 +76,11 @@ const RenameDialog = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            className="bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+            onClick={() => onOpenChange(false)}
+          >
             取消
           </Button>
           <Button 

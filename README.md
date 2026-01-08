@@ -1,73 +1,341 @@
-# Welcome to your Lovable project
+# Curve - AI 科研对话平台
 
-## Project info
+<p align="center">
+  <img src="public/placeholder.svg" alt="Curve Logo" width="120" height="120">
+</p>
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+<p align="center">
+  <strong>专为科研人员设计的智能 AI 对话与协作平台</strong>
+</p>
 
-## How can I edit this code?
+<p align="center">
+  <a href="#核心功能">核心功能</a> •
+  <a href="#技术架构">技术架构</a> •
+  <a href="#快速开始">快速开始</a> •
+  <a href="#项目结构">项目结构</a> •
+  <a href="#开发指南">开发指南</a>
+</p>
 
-There are several ways of editing your application.
+---
 
-**Use Lovable**
+## 📖 项目概述
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Curve 是一个现代化的 AI 科研对话平台，专为药物研发、数据分析和科研文献检索等场景设计。平台支持多 Agent 切换、对话分支管理、分子结构可视化、智能文件归档等功能，帮助科研人员高效地与 AI 进行交互和协作。
 
-Changes made via Lovable will be committed automatically to this repo.
+## ✨ 核心功能
 
-**Use your preferred IDE**
+### 🤖 多 Agent 系统
+- **Xtalpi Agent**: 分子结构分析与药物研发助手
+- **Research Agent**: 科研文献检索与分析助手  
+- **Data Agent**: 数据分析与可视化助手
+- **Code Agent**: 编程开发与代码审查助手
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 🌳 对话分支管理
+- 从任意消息创建分支，探索不同的对话方向
+- 分支可视化树形视图
+- 支持分支合并（消息合并/摘要合并）
+- 分支重命名与删除
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 📁 智能文件管理
+- **Smart Folder**: 自动归档对话中的表格和图片
+- **File Center**: 集中管理项目所有文件资产
+- 支持 CSV/JSON/PDB 等多种格式
+- 分子结构图自动生成（基于 SMILES）
 
-Follow these steps:
+### 🧬 分子数据处理
+- SMILES 分子式解析与高亮
+- 分子结构 3D 可视化（3Dmol.js）
+- 分子属性表格渲染
+- PubChem 集成生成结构图
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 🔄 实时协作
+- 项目级别的消息管理
+- 多协作者支持
+- 实时消息同步（Supabase Realtime）
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🏗️ 技术架构
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 前端技术栈
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| React | 18.3.x | UI 框架 |
+| TypeScript | 5.8.x | 类型安全 |
+| Vite | 5.4.x | 构建工具 |
+| TailwindCSS | 3.4.x | 样式框架 |
+| React Router | 6.30.x | 路由管理 |
+| TanStack Query | 5.83.x | 数据请求 |
+| Radix UI | Latest | 无障碍组件 |
+| Recharts | 2.15.x | 数据可视化 |
+| 3Dmol.js | 2.5.x | 分子3D可视化 |
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+### 后端服务
+| 服务 | 用途 |
+|------|------|
+| Supabase | 数据库 + 认证 + 实时订阅 + 边缘函数 |
+| PostgreSQL | 数据存储 |
+| Supabase Edge Functions | AI 对话代理 |
+| Lovable AI Gateway | LLM 服务代理 |
+
+### 数据库模型
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  projects   │────<│  branches   │────<│  messages   │
+└─────────────┘     └─────────────┘     └─────────────┘
+       │                   │                   │
+       │                   │                   │
+       ▼                   ▼                   ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│collaborators│     │ file_assets │     │ (files JSON)│
+└─────────────┘     └─────────────┘     └─────────────┘
 ```
 
-**Edit a file directly in GitHub**
+## 🚀 快速开始
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### 环境要求
+- Node.js 18+
+- pnpm 8+ (推荐) 或 npm/yarn
+- Supabase 账号
 
-**Use GitHub Codespaces**
+### 安装步骤
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. **克隆仓库**
+```bash
+git clone <repository-url>
+cd Curve_Cursor
+```
 
-## What technologies are used for this project?
+2. **安装依赖**
+```bash
+pnpm install
+```
 
-This project is built with:
+3. **配置环境变量**
+```bash
+# 创建 .env.local 文件
+cp .env.example .env.local
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+# 填写以下必需的环境变量
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+```
 
-## How can I deploy this project?
+4. **启动开发服务器**
+```bash
+pnpm dev
+```
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+5. **访问应用**
+```
+http://localhost:8080
+```
 
-## Can I connect a custom domain to my Lovable project?
+### Supabase 配置
 
-Yes, you can!
+1. 创建 Supabase 项目
+2. 运行 `supabase/migrations/` 目录下的 SQL 迁移脚本
+3. 在 Edge Functions 中配置 `LOVABLE_API_KEY` 环境变量
+4. 部署 `chat` 边缘函数
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 📁 项目结构
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```
+Curve_Cursor/
+├── public/                     # 静态资源
+├── src/
+│   ├── App.tsx                 # 应用入口，路由配置
+│   ├── main.tsx                # React 挂载点
+│   ├── index.css               # 全局样式 + CSS 变量
+│   │
+│   ├── components/
+│   │   ├── curve/              # 业务组件
+│   │   │   ├── ChatArea.tsx    # 核心对话区域 ⭐
+│   │   │   ├── Sidebar.tsx     # 侧边栏项目管理
+│   │   │   ├── ChatInput.tsx   # 对话输入框
+│   │   │   ├── AgentMessage.tsx # AI 消息渲染
+│   │   │   ├── UserMessage.tsx  # 用户消息渲染
+│   │   │   ├── BranchTreeView.tsx # 分支树视图
+│   │   │   ├── SmartFolderPanel.tsx # 智能文件夹
+│   │   │   ├── FileCenter.tsx  # 文件中心
+│   │   │   ├── MoleculeStructure.tsx # 分子结构3D
+│   │   │   └── ...             # 其他业务组件
+│   │   │
+│   │   └── ui/                 # shadcn/ui 基础组件
+│   │       ├── button.tsx
+│   │       ├── dialog.tsx
+│   │       └── ...
+│   │
+│   ├── hooks/                  # 自定义 Hooks
+│   │   ├── useProjects.ts      # 项目 & 消息管理
+│   │   ├── useBranches.ts      # 分支 & 协作者管理
+│   │   ├── useFileAssets.ts    # 文件资产管理
+│   │   └── useSmartFolder.ts   # 智能归档逻辑
+│   │
+│   ├── contexts/
+│   │   └── NavigationContext.tsx # 全局导航状态
+│   │
+│   ├── layouts/
+│   │   └── MainLayout.tsx      # 主布局（侧栏+内容+面板）
+│   │
+│   ├── pages/
+│   │   ├── Index.tsx           # 主页（对话页面）
+│   │   ├── Agent.tsx           # Agent 管理页
+│   │   └── Workflow.tsx        # 工作流页面
+│   │
+│   ├── lib/
+│   │   ├── agents.ts           # Agent 定义与提示词
+│   │   ├── messageUtils.ts     # 消息解析工具
+│   │   ├── moleculeDataUtils.ts # 分子数据解析
+│   │   └── utils.ts            # 通用工具函数
+│   │
+│   └── integrations/
+│       └── supabase/
+│           ├── client.ts       # Supabase 客户端
+│           └── types.ts        # 数据库类型定义
+│
+├── supabase/
+│   ├── config.toml             # Supabase 本地配置
+│   ├── functions/
+│   │   └── chat/
+│   │       └── index.ts        # AI 对话边缘函数
+│   └── migrations/             # 数据库迁移脚本
+│
+├── tailwind.config.ts          # Tailwind 配置
+├── vite.config.ts              # Vite 构建配置
+└── package.json                # 依赖配置
+```
+
+## 🔧 开发指南
+
+### 核心概念
+
+#### 1. 消息解析系统
+消息内容支持特殊标签解析：
+- `<reasoning>...</reasoning>` - 推理过程
+- `<tools>...</tools>` - 调用的工具
+- `<conclusion>...</conclusion>` - 分析结论
+- `<molecule-data>...</molecule-data>` - 分子数据表格
+- `<file name="..." size="...">...</file>` - 文件附件
+
+#### 2. 分支系统
+- 每个项目有一个自动创建的"主线"分支
+- 从任意消息可创建子分支
+- 分支可合并回主线（消息或摘要形式）
+
+#### 3. 实时同步
+- 使用 Supabase Realtime 监听数据变化
+- 项目、消息、分支等数据实时更新
+
+### 常用命令
+
+```bash
+# 开发模式
+pnpm dev
+
+# 构建生产版本
+pnpm build
+
+# 开发模式构建
+pnpm build:dev
+
+# 代码检查
+pnpm lint
+
+# 预览构建结果
+pnpm preview
+```
+
+### 添加新 Agent
+
+1. 在 `src/lib/agents.ts` 中添加 Agent 定义：
+```typescript
+{
+  id: "new-agent",
+  name: "New Agent",
+  description: "描述",
+  icon: "🔬",
+  color: "bg-purple-500",
+  systemPrompt: `你的系统提示词...`
+}
+```
+
+2. 在 `supabase/functions/chat/index.ts` 中同步添加 Agent 提示词
+
+### 样式系统
+
+项目使用 CSS 变量实现主题定制：
+- 主色调: `--primary` / XtalPi Blue (#123aff)
+- 侧边栏: `--sidebar-bg`, `--sidebar-border`
+- 消息气泡: `--message-user-bg`, `--message-agent-bg`
+
+## 📊 数据库表结构
+
+### projects
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| name | text | 项目名称 |
+| icon | text | 项目图标 |
+| author | text | 创建者 |
+| is_active | boolean | 是否激活 |
+
+### branches
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| project_id | uuid | 所属项目 |
+| name | text | 分支名称 |
+| is_main | boolean | 是否主分支 |
+| parent_branch_id | uuid | 父分支 |
+| branch_point_message_id | uuid | 分支点消息 |
+
+### messages
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| project_id | uuid | 所属项目 |
+| branch_id | uuid | 所属分支 |
+| role | text | user/assistant |
+| content | text | 消息内容 |
+| agent_id | text | 使用的 Agent |
+| files | jsonb | 附件信息 |
+
+### file_assets
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| project_id | uuid | 所属项目 |
+| branch_id | uuid | 所属分支 |
+| message_id | uuid | 来源消息 |
+| name | text | 文件名 |
+| type | text | 文件类型 |
+| category | text | 分类 |
+| content | text | 文件内容 |
+
+## 🎨 UI/UX 设计规范
+
+### 颜色系统
+- **主色**: XtalPi Blue `#123aff`
+- **渐变**: Blue-Cyan `#1609a0 → #00ffff`
+- **成功**: Green `#00ff9a`
+- **背景**: Light Gray `#fafafa`
+
+### 组件规范
+- 圆角: `rounded-lg` (8px) / `rounded-xl` (12px)
+- 阴影: `shadow-card` / `shadow-lg`
+- 过渡: `transition-all duration-200`
+
+## 🔐 安全注意事项
+
+1. **项目隔离**: 严格的 project_id 过滤，防止跨项目数据泄露
+2. **API 密钥**: 敏感密钥存储在 Supabase Edge Functions 环境变量中
+3. **请求验证**: 所有 API 请求需携带有效的 Authorization header
+
+## 📝 License
+
+MIT License - 详见 LICENSE 文件
+
+---
+
+<p align="center">
+  Built with ❤️ by XtalPi Team
+</p>

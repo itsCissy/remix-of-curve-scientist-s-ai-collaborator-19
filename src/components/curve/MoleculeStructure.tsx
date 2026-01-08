@@ -16,9 +16,22 @@ interface MoleculeStructureProps {
   compact?: boolean;
 }
 
+// Validate SMILES string before making requests
+const isValidSmiles = (smiles: string): boolean => {
+  if (!smiles || typeof smiles !== 'string') return false;
+  const trimmed = smiles.trim();
+  if (trimmed.length < 2 || trimmed.length > 500) return false;
+  // Must contain at least one organic atom symbol
+  const organicAtoms = /[CNOPSFIBcnops]/;
+  return organicAtoms.test(trimmed);
+};
+
 // Use PubChem API for molecule structure image
 const getMoleculeImageUrl = (smiles: string, size: number = 200) => {
-  const encodedSmiles = encodeURIComponent(smiles);
+  if (!isValidSmiles(smiles)) {
+    return ''; // Return empty string for invalid SMILES
+  }
+  const encodedSmiles = encodeURIComponent(smiles.trim());
   return `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodedSmiles}/PNG?image_size=${size}x${size}`;
 };
 
@@ -33,6 +46,10 @@ const MoleculeStructure = ({
   const [imageError, setImageError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  
+  // Validate SMILES before rendering
+  const isValid = isValidSmiles(smiles);
+  const imageUrl = isValid ? getMoleculeImageUrl(smiles, size * 2) : '';
 
   const handleCopy = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -47,20 +64,26 @@ const MoleculeStructure = ({
 
   const handleDownload = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isValidSmiles(smiles)) {
+      return;
+    }
     setDownloading(true);
     
     try {
-      const response = await fetch(getMoleculeImageUrl(smiles, 500));
+      const imageUrl = getMoleculeImageUrl(smiles, 500);
+      if (!imageUrl) return;
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error('Failed to fetch image');
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const blobUrl = URL.createObjectURL(blob);
       
       const a = document.createElement("a");
-      a.href = url;
+      a.href = blobUrl;
       a.download = `molecule_${smiles.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 20)}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(blobUrl);
     } catch (err) {
       console.error("Failed to download:", err);
     } finally {
@@ -70,7 +93,10 @@ const MoleculeStructure = ({
 
   const handleOpenPubChem = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    const encodedSmiles = encodeURIComponent(smiles);
+    if (!isValidSmiles(smiles)) {
+      return;
+    }
+    const encodedSmiles = encodeURIComponent(smiles.trim());
     window.open(`https://pubchem.ncbi.nlm.nih.gov/compound/${encodedSmiles}`, '_blank');
   }, [smiles]);
 
@@ -91,8 +117,8 @@ const MoleculeStructure = ({
           </div>
         )}
         
-        {/* Error state */}
-        {imageError ? (
+        {/* Error state or invalid SMILES */}
+        {!isValid || imageError ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground text-xs p-2 text-center bg-muted/10">
             <svg className="w-6 h-6 mb-1 text-muted-foreground/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <circle cx="8" cy="8" r="3" />
@@ -101,11 +127,11 @@ const MoleculeStructure = ({
               <line x1="10.5" y1="9.5" x2="13.5" y2="14.5" />
               <line x1="13.5" y1="9.5" x2="10.5" y2="14.5" />
             </svg>
-            <span className="text-[10px]">加载失败</span>
+            <span className="text-[10px]">{!isValid ? "无效的SMILES" : "加载失败"}</span>
           </div>
-        ) : (
+        ) : imageUrl ? (
           <img
-            src={getMoleculeImageUrl(smiles, size * 2)}
+            src={imageUrl}
             alt={`Molecule: ${smiles}`}
             className={cn(
               "w-full h-full object-contain",
@@ -118,7 +144,7 @@ const MoleculeStructure = ({
               setImageError(true);
             }}
           />
-        )}
+        ) : null}
 
         {/* Action buttons overlay */}
         {showActions && !imageError && !imageLoading && (

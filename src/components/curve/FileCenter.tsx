@@ -608,11 +608,11 @@ const FileCenter = ({
               此操作不可逆。删除后，文件 "{assetToDelete?.name}" 将永久移除。
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="mt-4">
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className=""
             >
               确认删除
             </AlertDialogAction>
@@ -667,7 +667,11 @@ const FileCenter = ({
             )}
           </ScrollArea>
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => setPreviewAsset(null)}>
+            <Button
+              variant="outline"
+              className="bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+              onClick={() => setPreviewAsset(null)}
+            >
               关闭
             </Button>
             <Button onClick={() => previewAsset && handleDownload(previewAsset)}>

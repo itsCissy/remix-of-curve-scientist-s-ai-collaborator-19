@@ -1,5 +1,6 @@
-import { useState, useRef, DragEvent } from "react";
-import { X, FolderOpen, Plus, ChevronDown, Beaker, Atom, FlaskConical, Microscope, Dna, Upload, FileText, Trash2, Check, Sparkles } from "lucide-react";
+import { useState, useRef, DragEvent, useMemo } from "react";
+import { X, FolderOpen, Plus, Beaker, Atom, FlaskConical, Microscope, Dna, Upload, FileText, Trash2, Check, Wand2, Search } from "lucide-react";
+import { AVAILABLE_SKILLS, Skill } from "@/lib/skills";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,16 @@ import AgentAvatar from "./AgentAvatar";
 interface NewProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onProjectCreate?: (projectData: { name: string; icon: string; description: string }) => void;
+  onProjectCreate?: (projectData: { 
+    name: string; 
+    icon: string; 
+    description: string;
+    context_path?: string;
+    selected_agents?: string[];
+    tags?: string[];
+    selected_skills?: string[];
+    uploaded_files?: UploadedFile[];
+  }) => void;
 }
 
 interface UploadedFile {
@@ -27,29 +37,11 @@ interface UploadedFile {
   type: string;
 }
 
-interface ProjectTemplate {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  tags: string[];
-  agents: string[];
-}
-
 const availableAgents = [
   { id: "xtalpi", name: "Xtalpi Agent", description: "通用科学分析", color: "from-xtalpi-blue-dark to-xtalpi-cyan" },
   { id: "molecule", name: "Molecule Agent", description: "分子结构分析", color: "from-xtalpi-blue to-xtalpi-cyan" },
   { id: "crystal", name: "Crystal Agent", description: "晶体结构预测", color: "from-xtalpi-green-dark to-xtalpi-green" },
   { id: "synthesis", name: "Synthesis Agent", description: "合成路线设计", color: "from-xtalpi-green-dark to-xtalpi-teal" },
-];
-
-const projectTemplates: ProjectTemplate[] = [
-  { id: "molecule", name: "分子分析", description: "分子结构分析与性质预测", icon: "🧬", tags: ["分子分析", "ADMET"], agents: ["molecule"] },
-  { id: "crystal", name: "晶体预测", description: "晶体结构预测与多晶型分析", icon: "💎", tags: ["晶体结构"], agents: ["crystal"] },
-  { id: "drug", name: "药物设计", description: "药物分子设计与优化", icon: "💊", tags: ["药物设计", "小分子"], agents: ["molecule", "synthesis"] },
-  { id: "synthesis", name: "合成路线", description: "化学合成路线规划", icon: "⚗️", tags: ["合成路线"], agents: ["synthesis"] },
-  { id: "hte", name: "高通量实验", description: "高通量实验设计与分析", icon: "🔬", tags: ["高通量筛选", "HTE"], agents: ["xtalpi"] },
-  { id: "custom", name: "自定义项目", description: "从空白开始创建项目", icon: "📋", tags: [], agents: ["xtalpi"] },
 ];
 
 const suggestedTags = [
@@ -72,10 +64,22 @@ const NewProjectDialog = ({ open, onOpenChange, onProjectCreate }: NewProjectDia
   const [selectedAgents, setSelectedAgents] = useState<string[]>(["xtalpi"]);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [skillSearchQuery, setSkillSearchQuery] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Filter skills based on search query
+  const filteredSkills = useMemo(() => {
+    if (!skillSearchQuery.trim()) return AVAILABLE_SKILLS;
+    const query = skillSearchQuery.toLowerCase();
+    return AVAILABLE_SKILLS.filter(
+      (skill) =>
+        skill.name.toLowerCase().includes(query) ||
+        skill.description.toLowerCase().includes(query)
+    );
+  }, [skillSearchQuery]);
 
   const handleCreate = () => {
     if (projectName.trim()) {
@@ -83,6 +87,11 @@ const NewProjectDialog = ({ open, onOpenChange, onProjectCreate }: NewProjectDia
         name: projectName.trim(),
         icon: selectedIcon,
         description: projectDescription,
+        context_path: contextPath.trim() || undefined,
+        selected_agents: selectedAgents.length > 0 ? selectedAgents : undefined,
+        tags: tags.length > 0 ? tags : undefined,
+        selected_skills: selectedSkills.length > 0 ? selectedSkills : undefined,
+        uploaded_files: uploadedFiles.length > 0 ? uploadedFiles : undefined,
       });
     }
     onOpenChange(false);
@@ -102,18 +111,17 @@ const NewProjectDialog = ({ open, onOpenChange, onProjectCreate }: NewProjectDia
     setSelectedAgents(["xtalpi"]);
     setTags([]);
     setTagInput("");
-    setSelectedTemplate(null);
+    setSelectedSkills([]);
+    setSkillSearchQuery("");
     setUploadedFiles([]);
   };
 
-  const handleTemplateSelect = (template: ProjectTemplate) => {
-    setSelectedTemplate(template.id);
-    setSelectedIcon(template.icon);
-    setTags(template.tags);
-    setSelectedAgents(template.agents);
-    if (template.id !== "custom") {
-      setProjectDescription(template.description);
-    }
+  const toggleSkill = (skillId: string) => {
+    setSelectedSkills((prev) =>
+      prev.includes(skillId)
+        ? prev.filter((id) => id !== skillId)
+        : [...prev, skillId]
+    );
   };
 
   const toggleAgent = (agentId: string) => {
@@ -207,36 +215,6 @@ const NewProjectDialog = ({ open, onOpenChange, onProjectCreate }: NewProjectDia
 
         <div className="overflow-y-auto max-h-[calc(90vh-180px)] scrollbar-thin">
           <div className="px-6 py-5 space-y-6">
-            {/* Template Selection Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <Sparkles className="w-4 h-4 text-primary" />
-                项目模板
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {projectTemplates.map((template) => (
-                  <button
-                    key={template.id}
-                    onClick={() => handleTemplateSelect(template)}
-                    className={`relative p-3 rounded-lg border text-left transition-all ${
-                      selectedTemplate === template.id
-                        ? "border-primary bg-primary/5 ring-1 ring-primary"
-                        : "border-border hover:border-primary/50 hover:bg-muted/50"
-                    }`}
-                  >
-                    {selectedTemplate === template.id && (
-                      <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                        <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                      </div>
-                    )}
-                    <div className="text-xl mb-1">{template.icon}</div>
-                    <div className="text-xs font-medium text-foreground">{template.name}</div>
-                    <div className="text-[10px] text-muted-foreground line-clamp-1">{template.description}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Basic Info Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -288,6 +266,74 @@ const NewProjectDialog = ({ open, onOpenChange, onProjectCreate }: NewProjectDia
                   placeholder="描述项目目标、研究方向或实验计划..."
                   className="min-h-[80px] resize-none bg-muted/30 border-border focus-visible:ring-primary"
                 />
+              </div>
+            </div>
+
+            {/* Skills Selection Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Wand2 className="w-4 h-4 text-primary" strokeWidth={1.5} />
+                  应用技能
+                </div>
+                {selectedSkills.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    已选择 {selectedSkills.length} 个
+                  </span>
+                )}
+              </div>
+
+              {/* Skills Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
+                <input
+                  type="text"
+                  value={skillSearchQuery}
+                  onChange={(e) => setSkillSearchQuery(e.target.value)}
+                  placeholder="搜索技能..."
+                  className="w-full h-9 pl-9 pr-3 rounded-lg border border-border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                />
+              </div>
+
+              {/* Skills Grid */}
+              <div className="max-h-[160px] overflow-y-auto rounded-lg border border-border/50 bg-muted/20 p-2">
+                {filteredSkills.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {filteredSkills.map((skill) => {
+                      const isSelected = selectedSkills.includes(skill.id);
+                      return (
+                        <button
+                          key={skill.id}
+                          type="button"
+                          onClick={() => toggleSkill(skill.id)}
+                          className={`h-9 flex items-center gap-2 px-3 rounded-lg border text-left transition-all ${
+                            isSelected
+                              ? "bg-[#f0f2ff] border-[#123aff] text-[#123aff]"
+                              : "bg-slate-50 border-transparent hover:border-slate-200 text-foreground"
+                          }`}
+                        >
+                          <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                            <skill.icon className="w-3.5 h-3.5 text-slate-500" strokeWidth={1.5} />
+                          </div>
+                          <span className="text-sm font-medium truncate flex-1">
+                            {skill.name}
+                          </span>
+                          {isSelected && (
+                            <Check className="w-4 h-4 flex-shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <Search className="w-8 h-8 text-muted-foreground/50 mb-2" strokeWidth={1.5} />
+                    <p className="text-sm text-muted-foreground">暂无匹配技能</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      前往 <span className="text-[#123aff]">Skills Hub</span> 创建新技能
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -499,9 +545,9 @@ const NewProjectDialog = ({ open, onOpenChange, onProjectCreate }: NewProjectDia
           </div>
           <div className="flex items-center gap-3">
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={handleCancel}
-              className="hover:bg-muted"
+              className="bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
             >
               取消
             </Button>

@@ -245,4 +245,173 @@
   .glow-green {
     box-shadow: 0 0 20px hsl(156 100% 50% / 0.3);
   }
+
+  /* Fade in animation */
+  @keyframes fade-in {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.4s ease-out forwards;
+  }
+
+  /* Fade in up animation - 从下往上移动 10px */
+  @keyframes fade-in-up {
+    0% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out forwards;
+  }
+
+  /* ==========================================
+     AI 会话流动效系统
+     ========================================== */
+
+  /* 1. 思考阶段 - 脉冲呼吸效果 */
+  @keyframes pulse-soft {
+    0%, 100% { 
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    50% { 
+      opacity: 1;
+      transform: scale(1.05);
+    }
+  }
+
+  .animate-pulse-soft {
+    animation: pulse-soft 1.5s ease-in-out infinite;
+  }
+
+  /* 2. 流式光标闪烁效果 */
+  @keyframes cursor-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+
+  .streaming-cursor::after {
+    content: '▎';
+    display: inline-block;
+    animation: cursor-blink 0.8s step-end infinite;
+    color: #123aff;
+    margin-left: 1px;
+    font-weight: 400;
+  }
+
+  /* 3. 工具标签依次淡入 - staggered animation */
+  @keyframes tool-fade-in {
+    0% {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .tool-tag-stagger {
+    opacity: 0;
+    animation: tool-fade-in 0.3s ease-out forwards;
+  }
+
+  .tool-tag-stagger:nth-child(1) { animation-delay: 0ms; }
+  .tool-tag-stagger:nth-child(2) { animation-delay: 100ms; }
+  .tool-tag-stagger:nth-child(3) { animation-delay: 200ms; }
+  .tool-tag-stagger:nth-child(4) { animation-delay: 300ms; }
+  .tool-tag-stagger:nth-child(5) { animation-delay: 400ms; }
+  .tool-tag-stagger:nth-child(6) { animation-delay: 500ms; }
+
+  /* 4. 内容区块渐显 */
+  @keyframes content-reveal {
+    0% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-content-reveal {
+    animation: content-reveal 0.4s ease-out forwards;
+  }
+
+  /* 5. 操作按钮淡入 */
+  @keyframes actions-fade-in {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  .animate-actions-fade-in {
+    animation: actions-fade-in 0.3s ease-out 0.2s forwards;
+    opacity: 0;
+  }
+
+  /* 6. 推理区域折叠展开过渡 */
+  .reasoning-collapse {
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+  }
+
+  .reasoning-collapse.collapsed {
+    max-height: 0;
+    opacity: 0;
+  }
+
+  .reasoning-collapse.expanded {
+    max-height: 500px;
+    opacity: 1;
+  }
+
+  /* 7. 消息容器入场动画 */
+  @keyframes message-enter {
+    0% {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-message-enter {
+    animation: message-enter 0.35s ease-out forwards;
+  }
+
+  /* 8. 完成状态指示 - 轻微发光消退 */
+  @keyframes completion-glow {
+    0% {
+      box-shadow: 0 0 0 0 rgba(18, 58, 255, 0.1);
+    }
+    50% {
+      box-shadow: 0 0 8px 2px rgba(18, 58, 255, 0.08);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(18, 58, 255, 0);
+    }
+  }
+
+  .animate-completion-glow {
+    animation: completion-glow 0.6s ease-out forwards;
+  }
 }

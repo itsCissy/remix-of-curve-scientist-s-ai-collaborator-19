@@ -120,25 +120,29 @@ serve(async (req) => {
 
   try {
     const { messages, agentId, systemPrompt } = await req.json() as ChatRequest;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    // Read AI configuration from environment variables
+    const AI_API_KEY = Deno.env.get("AI_API_KEY") || Deno.env.get("LOVABLE_API_KEY");
+    const AI_GATEWAY_URL = Deno.env.get("AI_GATEWAY_URL") || "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const AI_MODEL = Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash";
+    
+    if (!AI_API_KEY) {
+      throw new Error("AI_API_KEY or LOVABLE_API_KEY is not configured");
     }
 
     // Use custom prompt, agent-specific prompt, or default
     const finalPrompt = systemPrompt || (agentId && AGENT_PROMPTS[agentId]) || DEFAULT_PROMPT;
 
-    console.log("Processing chat request with agent:", agentId || "default", "messages:", messages.length);
+    console.log("Processing chat request with agent:", agentId || "default", "model:", AI_MODEL, "messages:", messages.length);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(AI_GATEWAY_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: AI_MODEL,
         messages: [
           { role: "system", content: finalPrompt },
           ...messages,

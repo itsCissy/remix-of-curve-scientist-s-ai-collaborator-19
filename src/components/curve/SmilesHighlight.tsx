@@ -19,16 +19,32 @@ interface MoleculeInfo {
   cid?: number;
 }
 
+// Validate SMILES string before making requests
+const isValidSmilesForRequest = (smiles: string): boolean => {
+  if (!smiles || typeof smiles !== 'string') return false;
+  const trimmed = smiles.trim();
+  if (trimmed.length < 2 || trimmed.length > 500) return false;
+  // Must contain at least one organic atom symbol
+  const organicAtoms = /[CNOPSFIBcnops]/;
+  return organicAtoms.test(trimmed);
+};
+
 // 使用 PubChem API 获取分子结构图
 const getMoleculeImageUrl = (smiles: string, size: number = 300) => {
-  const encodedSmiles = encodeURIComponent(smiles);
+  if (!isValidSmilesForRequest(smiles)) {
+    return ''; // Return empty string for invalid SMILES
+  }
+  const encodedSmiles = encodeURIComponent(smiles.trim());
   return `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodedSmiles}/PNG?image_size=${size}x${size}`;
 };
 
 // 从 PubChem 获取分子信息
 const fetchMoleculeInfo = async (smiles: string): Promise<MoleculeInfo | null> => {
+  if (!isValidSmilesForRequest(smiles)) {
+    return null;
+  }
   try {
-    const encodedSmiles = encodeURIComponent(smiles);
+    const encodedSmiles = encodeURIComponent(smiles.trim());
     const response = await fetch(
       `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodedSmiles}/property/MolecularFormula,MolecularWeight,IUPACName/JSON`
     );
@@ -93,10 +109,12 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
 
   // Fetch molecule info when popover opens
   useEffect(() => {
-    if (isOpen && !moleculeInfo && !infoLoading) {
+    if (isOpen && !moleculeInfo && !infoLoading && isValidSmilesForRequest(smiles)) {
       setInfoLoading(true);
       fetchMoleculeInfo(smiles).then(info => {
         setMoleculeInfo(info);
+        setInfoLoading(false);
+      }).catch(() => {
         setInfoLoading(false);
       });
     }
@@ -142,20 +160,29 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    if (!isValidSmilesForRequest(smiles)) {
+      return;
+    }
     setDownloading(true);
     
     try {
-      const response = await fetch(getMoleculeImageUrl(smiles, 500));
+      const imageUrl = getMoleculeImageUrl(smiles, 500);
+      if (!imageUrl) {
+        setDownloading(false);
+        return;
+      }
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error('Failed to fetch image');
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const blobUrl = URL.createObjectURL(blob);
       
       const a = document.createElement("a");
-      a.href = url;
+      a.href = blobUrl;
       a.download = `molecule_${smiles.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 20)}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(blobUrl);
     } catch (err) {
       console.error("Failed to download:", err);
     } finally {
@@ -301,21 +328,30 @@ const SmilesHighlight = ({ smiles, className }: SmilesHighlightProps) => {
                 <span>无法加载分子结构</span>
                 <span className="text-muted-foreground/70 mt-1">请检查SMILES格式</span>
               </div>
+            ) : isValidSmilesForRequest(smiles) ? (
+              (() => {
+                const imageUrl = getMoleculeImageUrl(smiles);
+                return imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={`Molecule structure: ${smiles}`}
+                    className={cn(
+                      "w-full h-full object-contain",
+                      imageLoading ? "opacity-0" : "opacity-100",
+                      "transition-opacity duration-200"
+                    )}
+                    onLoad={() => setImageLoading(false)}
+                    onError={() => {
+                      setImageLoading(false);
+                      setImageError(true);
+                    }}
+                  />
+                ) : null;
+              })()
             ) : (
-              <img
-                src={getMoleculeImageUrl(smiles)}
-                alt={`Molecule structure: ${smiles}`}
-                className={cn(
-                  "w-full h-full object-contain",
-                  imageLoading ? "opacity-0" : "opacity-100",
-                  "transition-opacity duration-200"
-                )}
-                onLoad={() => setImageLoading(false)}
-                onError={() => {
-                  setImageLoading(false);
-                  setImageError(true);
-                }}
-              />
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground text-xs p-4 text-center">
+                <span>无效的SMILES格式</span>
+              </div>
             )}
           </div>
 

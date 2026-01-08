@@ -2,7 +2,6 @@ import AgentAvatar from "./AgentAvatar";
 import StructuredMessage from "./StructuredMessage";
 import { ParsedContent, parseMessageContent } from "@/lib/messageUtils";
 import { FileAttachment } from "./FileViewer";
-import MessageBranchButton from "./MessageBranchButton";
 
 interface AgentMessageProps {
   content: string;
@@ -11,6 +10,7 @@ interface AgentMessageProps {
   files?: FileAttachment[];
   messageId?: string;
   onCreateBranch?: (messageId: string) => void;
+  onSaveAsSkill?: (messageId: string, content: string) => void;
 }
 
 const AgentMessage = ({ 
@@ -20,6 +20,7 @@ const AgentMessage = ({
   files,
   messageId,
   onCreateBranch,
+  onSaveAsSkill,
 }: AgentMessageProps) => {
   // Safely parse content if parsedContent is not provided
   const parsed = parsedContent ?? parseMessageContent(content);
@@ -28,7 +29,10 @@ const AgentMessage = ({
   const allFiles = [...(files || []), ...(parsed.files || [])];
 
   return (
-    <div className="flex items-start gap-3 animate-fade-in group">
+    <div 
+      className="flex items-start gap-3 animate-message-enter group"
+      data-message-id={messageId}
+    >
       <div className="flex-shrink-0 mt-1">
         <AgentAvatar size="md" />
       </div>
@@ -41,14 +45,11 @@ const AgentMessage = ({
           isStreaming={isStreaming}
           files={allFiles.length > 0 ? allFiles : undefined}
           moleculeData={parsed.moleculeData}
+          messageId={messageId}
+          onCreateBranch={onCreateBranch}
+          onSaveAsSkill={onSaveAsSkill}
         />
       </div>
-      {/* Branch button */}
-      {!isStreaming && messageId && onCreateBranch && (
-        <div className="flex-shrink-0 mt-1">
-          <MessageBranchButton onCreateBranch={() => onCreateBranch(messageId)} />
-        </div>
-      )}
     </div>
   );
 };

@@ -1,35 +1,20 @@
-import { useState, useEffect } from "react";
-import Sidebar from "@/components/curve/Sidebar";
+import { useOutletContext } from "react-router-dom";
 import ChatArea from "@/components/curve/ChatArea";
-import { useProjects, Project } from "@/hooks/useProjects";
+import { Project } from "@/hooks/useProjects";
+
+type OutletContext = {
+  activeProject: Project | null;
+};
 
 const Index = () => {
-  const { 
-    projects, 
-    isLoading, 
-    activeProject, 
-    createProject, 
-    updateProject, 
-    deleteProject, 
-    setActive 
-  } = useProjects();
+  const { activeProject } = useOutletContext<OutletContext>();
 
   return (
-    <>
-      <Sidebar 
-        projects={projects}
-        isLoading={isLoading}
-        activeProject={activeProject}
-        onCreateProject={createProject}
-        onDeleteProject={deleteProject}
-        onRenameProject={(id, name) => updateProject(id, { name })}
-        onSelectProject={setActive}
-      />
-      <ChatArea 
-        projectId={activeProject?.id || null}
-        projectName={activeProject?.name || "New Project"}
-      />
-    </>
+    <ChatArea 
+      key={activeProject?.id || null}
+      projectId={activeProject?.id || null}
+      projectName={activeProject?.name || "New Project"}
+    />
   );
 };
 

@@ -58,9 +58,21 @@ const formatFormula = (formula: string): React.ReactNode => {
   return <>{parts}</>;
 };
 
+// Validate SMILES before making requests
+const isValidSmilesForRequest = (smiles: string): boolean => {
+  if (!smiles || typeof smiles !== 'string') return false;
+  const trimmed = smiles.trim();
+  if (trimmed.length < 2 || trimmed.length > 500) return false;
+  const organicAtoms = /[CNOPSFIBcnops]/;
+  return organicAtoms.test(trimmed);
+};
+
 const fetchMoleculeProperties = async (smiles: string): Promise<MoleculeProperties | null> => {
+  if (!isValidSmilesForRequest(smiles)) {
+    return null;
+  }
   try {
-    const encodedSmiles = encodeURIComponent(smiles);
+    const encodedSmiles = encodeURIComponent(smiles.trim());
     const response = await fetch(
       `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodedSmiles}/property/MolecularFormula,MolecularWeight,XLogP,TPSA,HBondDonorCount,HBondAcceptorCount,RotatableBondCount,HeavyAtomCount,Complexity,Charge,IUPACName/JSON`
     );
@@ -97,8 +109,11 @@ const fetchMoleculeProperties = async (smiles: string): Promise<MoleculeProperti
 
 // 从 PubChem 获取相似化合物
 const fetchSimilarCompounds = async (smiles: string, threshold: number = 90): Promise<SimilarCompound[]> => {
+  if (!isValidSmilesForRequest(smiles)) {
+    return [];
+  }
   try {
-    const encodedSmiles = encodeURIComponent(smiles);
+    const encodedSmiles = encodeURIComponent(smiles.trim());
     
     // First get CIDs of similar compounds
     const cidResponse = await fetch(
@@ -202,7 +217,11 @@ const Molecule3DViewer = ({ smiles }: { smiles: string }) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!smiles || !containerRef.current) return;
+    if (!isValidSmilesForRequest(smiles) || !containerRef.current) {
+      setIsLoading(false);
+      setError("无效的SMILES格式");
+      return;
+    }
 
     const load3DViewer = async () => {
       setIsLoading(true);
@@ -220,7 +239,7 @@ const Molecule3DViewer = ({ smiles }: { smiles: string }) => {
         });
         viewerRef.current = viewer;
 
-        const encodedSmiles = encodeURIComponent(smiles);
+        const encodedSmiles = encodeURIComponent(smiles.trim());
         const response = await fetch(
           `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodedSmiles}/SDF?record_type=3d`
         );
@@ -477,14 +496,17 @@ const MoleculePropertiesPanel = ({ smiles, className, onLoadSmiles }: MoleculePr
   const [activeTab, setActiveTab] = useState("properties");
 
   useEffect(() => {
-    if (!smiles) {
+    if (!smiles || !isValidSmilesForRequest(smiles)) {
       setProperties(null);
+      setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     fetchMoleculeProperties(smiles).then((props) => {
       setProperties(props);
+      setIsLoading(false);
+    }).catch(() => {
       setIsLoading(false);
     });
   }, [smiles]);
@@ -560,7 +582,7 @@ const MoleculePropertiesPanel = ({ smiles, className, onLoadSmiles }: MoleculePr
                   icon={Activity}
                   label="TPSA"
                   value={properties.tpsa}
-                  unit="Ų"
+                  unit="Å²"
                   color="bg-amber-500/10 text-amber-600 dark:text-amber-400"
                 />
                 <PropertyCard

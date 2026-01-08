@@ -1,44 +1,16 @@
-import { Brain, Wrench, CheckCircle, ChevronDown, Sparkles, Copy, Check } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Brain, CheckCircle, Copy, Check, GitBranch, Wand2, ChevronRight } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "./MarkdownRenderer";
-import ThinkingLoader from "./ThinkingLoader";
 import FileViewer, { FileAttachment } from "./FileViewer";
 import MoleculeResultTabs from "./MoleculeResultTabs";
 import { ParsedMoleculeResult } from "@/lib/moleculeDataUtils";
-// Typewriter hook for character-by-character display
-const useTypewriter = (text: string, speed: number = 20, enabled: boolean = true) => {
-  const [displayedText, setDisplayedText] = useState("");
-  const [isComplete, setIsComplete] = useState(false);
-
-  useEffect(() => {
-    if (!enabled) {
-      setDisplayedText(text);
-      setIsComplete(true);
-      return;
-    }
-
-    setDisplayedText("");
-    setIsComplete(false);
-    
-    if (!text) return;
-
-    let index = 0;
-    const timer = setInterval(() => {
-      if (index < text.length) {
-        setDisplayedText(text.slice(0, index + 1));
-        index++;
-      } else {
-        setIsComplete(true);
-        clearInterval(timer);
-      }
-    }, speed);
-
-    return () => clearInterval(timer);
-  }, [text, speed, enabled]);
-
-  return { displayedText, isComplete };
-};
+import ThinkingLoader from "./ThinkingLoader";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ReasoningSectionProps {
   content: string;
@@ -46,108 +18,36 @@ interface ReasoningSectionProps {
 }
 
 const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
-  const streaming = Boolean(isStreaming);
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [progress, setProgress] = useState(0);
-
-  // Simulate progress based on content length and streaming state
-  useEffect(() => {
-    if (streaming) {
-      // Estimate progress based on typical response patterns
-      const estimatedTotal = 500; // Expected average chars
-      const currentProgress = Math.min((content.length / estimatedTotal) * 100, 95);
-      setProgress(currentProgress);
-    } else if (content) {
-      setProgress(100);
-    }
-  }, [content, streaming]);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const summary = content.slice(0, 60) + (content.length > 60 ? '...' : '');
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border overflow-hidden transition-all duration-300",
-        streaming && "animate-fade-in",
-        streaming
-          ? "bg-primary/5 border-primary/30 shadow-[0_0_15px_rgba(18,58,255,0.15)]"
-          : "bg-muted/30 border-border/50"
-      )}
-    >
+    <div className="space-y-1 animate-content-reveal">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 px-4 py-3 hover:bg-muted/50 transition-colors"
+        className="flex items-center gap-1.5 w-full text-left hover:opacity-80 transition-all duration-200 group"
       >
-        <div className={cn("relative", streaming && "animate-pulse")}>
-          <Brain
-            className={cn(
-              "w-4 h-4 transition-colors duration-300",
-              streaming ? "text-primary" : "text-primary/70"
-            )}
-          />
-          {streaming && (
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-ping" />
-          )}
-        </div>
-        <span className="text-sm font-medium text-foreground">推理过程</span>
-
-        {/* Progress indicator */}
-        {streaming && (
-          <span className="ml-2 flex items-center gap-2 px-2 py-0.5 bg-primary/10 rounded-full">
-            <span className="text-xs text-primary font-medium">
-              {Math.round(progress)}%
-            </span>
-          </span>
-        )}
-
-        {!streaming && content && (
-          <span className="ml-2 text-xs text-accent bg-accent/10 px-2 py-0.5 rounded-full">
-            完成
-          </span>
-        )}
-
-        <div className="ml-auto">
-          <div
-            className={cn(
-              "transition-transform duration-200",
-              isExpanded ? "rotate-0" : "-rotate-90"
-            )}
-          >
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </div>
-        </div>
+        <ChevronRight 
+          className={cn(
+            "w-3 h-3 text-slate-400 flex-shrink-0 transition-transform duration-200",
+            isExpanded && "rotate-90"
+          )} 
+        />
+        <Brain className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+        <span className="text-xs text-slate-400 flex-1 truncate">
+          {summary}
+          {isStreaming && <span className="streaming-cursor" />}
+        </span>
       </button>
 
-      {/* Progress bar */}
-      {streaming && (
-        <div className="px-4 pb-2">
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-xtalpi-blue rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${progress}%` }}
-            >
-              <div className="h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div
+      <div 
         className={cn(
-          "grid transition-all duration-300 ease-out",
-          isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          "reasoning-collapse",
+          isExpanded ? "expanded" : "collapsed"
         )}
       >
-        <div className="overflow-hidden">
-          <div
-            className={cn(
-              "px-4 pb-3 text-sm leading-relaxed whitespace-pre-wrap",
-              streaming ? "text-foreground" : "text-muted-foreground"
-            )}
-          >
-            {content}
-            {streaming && (
-              <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse" />
-            )}
-          </div>
+        <div className="pl-5 ml-1.5 border-l border-slate-200 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap pt-1">
+          {content}
         </div>
       </div>
     </div>
@@ -156,166 +56,36 @@ const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
 
 interface ToolsSectionProps {
   tools: string[];
-  isNew?: boolean;
+  isStreaming?: boolean;
 }
 
-const ToolsSection = ({ tools, isNew }: ToolsSectionProps) => {
-  const animated = Boolean(isNew);
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [visibleTools, setVisibleTools] = useState<number>(0);
-
-  useEffect(() => {
-    if (animated) {
-      const timer = setInterval(() => {
-        setVisibleTools((prev) => {
-          if (prev >= tools.length) {
-            clearInterval(timer);
-            return prev;
-          }
-          return prev + 1;
-        });
-      }, 150);
-      return () => clearInterval(timer);
-    }
-
-    setVisibleTools(tools.length);
-  }, [tools.length, animated]);
-
+const ToolsSection = ({ tools, isStreaming }: ToolsSectionProps) => {
   return (
-    <div
-      className={cn(
-        "bg-primary/5 rounded-lg border border-primary/20 overflow-hidden",
-        animated && "animate-fade-in"
-      )}
-    >
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 px-4 py-3 hover:bg-primary/10 transition-colors"
-      >
-        <Wrench className="w-4 h-4 text-primary" />
-        <span className="text-sm font-medium text-foreground">调用工具与知识库</span>
-        <span className="ml-2 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full font-medium">
-          {tools.length} 项
+    <div className="flex flex-wrap gap-1.5 animate-content-reveal">
+      {tools.map((tool, index) => (
+        <span
+          key={index}
+          className="tool-tag-stagger inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600"
+        >
+          <CheckCircle className="w-3 h-3" style={{ color: '#10b981' }} />
+          {tool}
         </span>
-        <div className="ml-auto">
-          <div
-            className={cn(
-              "transition-transform duration-200",
-              isExpanded ? "rotate-0" : "-rotate-90"
-            )}
-          >
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </div>
-        </div>
-      </button>
-      <div
-        className={cn(
-          "grid transition-all duration-300 ease-out",
-          isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-        )}
-      >
-        <div className="overflow-hidden">
-          <div className="px-4 pb-3">
-            <div className="flex flex-wrap gap-2">
-              {tools.map((tool, index) => (
-                <span
-                  key={index}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-primary/10 text-primary rounded-md text-xs font-medium transition-all duration-300",
-                    index < visibleTools
-                      ? "opacity-100 translate-y-0 scale-100"
-                      : "opacity-0 translate-y-2 scale-95"
-                  )}
-                  style={{ transitionDelay: `${index * 50}ms` }}
-                >
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  {tool}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      ))}
     </div>
   );
 };
 
 interface ConclusionSectionProps {
   content: string;
-  enableTypewriter?: boolean;
-  animate?: boolean;
 }
 
-const ConclusionSection = ({ content, enableTypewriter, animate }: ConclusionSectionProps) => {
-  const shouldType = Boolean(enableTypewriter);
-  const shouldAnimate = Boolean(animate);
-  const { displayedText, isComplete } = useTypewriter(content, 15, shouldType);
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
+const ConclusionSection = ({ content }: ConclusionSectionProps) => {
   return (
-    <div
-      className={cn(
-        "bg-accent/5 rounded-lg border border-accent/20 overflow-hidden shadow-[0_0_20px_rgba(0,255,154,0.1)]",
-        shouldAnimate && "animate-scale-in"
-      )}
-    >
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-accent/10 bg-accent/5">
-        <div className="relative">
-          <CheckCircle className="w-4 h-4 text-accent" />
-          <Sparkles className="w-3 h-3 text-accent/80 absolute -top-1 -right-1 animate-pulse" />
-        </div>
-        <span className="text-sm font-medium text-foreground">分析结论</span>
-        <span className="text-xs text-accent bg-accent/10 px-2 py-0.5 rounded-full">
-          {isComplete ? "已完成" : "输出中..."}
-        </span>
-        <button
-          onClick={handleCopy}
-          className="ml-auto p-1.5 rounded-md hover:bg-accent/10 transition-colors text-accent"
-          title="复制结论"
-        >
-          {copied ? (
-            <Check className="w-4 h-4" />
-          ) : (
-            <Copy className="w-4 h-4" />
-          )}
-        </button>
-      </div>
-      <div className="px-4 py-3 text-sm">
-        <MarkdownRenderer content={displayedText} />
-        {!isComplete && shouldType && (
-          <span className="inline-block w-0.5 h-4 bg-accent ml-0.5 animate-pulse" />
-        )}
+    <div className="space-y-2">
+      <div className="text-sm">
+        <MarkdownRenderer content={content} />
       </div>
     </div>
-  );
-};
-
-interface TypewriterTextProps {
-  text: string;
-  speed?: number;
-  enabled?: boolean;
-}
-
-const TypewriterText = ({ text, speed = 20, enabled = true }: TypewriterTextProps) => {
-  const { displayedText, isComplete } = useTypewriter(text, speed, enabled);
-  
-  return (
-    <span>
-      {displayedText}
-      {!isComplete && enabled && (
-        <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse" />
-      )}
-    </span>
   );
 };
 
@@ -327,6 +97,9 @@ interface StructuredMessageProps {
   isStreaming?: boolean;
   files?: FileAttachment[];
   moleculeData?: ParsedMoleculeResult;
+  messageId?: string;
+  onCreateBranch?: (messageId: string) => void;
+  onSaveAsSkill?: (messageId: string, content: string) => void;
 }
 
 const StructuredMessage = ({
@@ -337,53 +110,191 @@ const StructuredMessage = ({
   isStreaming,
   files,
   moleculeData,
+  messageId,
+  onCreateBranch,
+  onSaveAsSkill,
 }: StructuredMessageProps) => {
   const hasStructuredContent = reasoning || (tools && tools.length > 0) || conclusion;
-  const streaming = Boolean(isStreaming);
+  const [copied, setCopied] = useState(false);
+  
+  // 判断是否有任何内容
+  const hasAnyContent = Boolean(
+    reasoning?.trim() ||
+    normalContent?.trim() ||
+    conclusion?.trim() ||
+    (tools && tools.length > 0) ||
+    (files && files.length > 0) ||
+    (moleculeData && moleculeData.molecules.length > 0)
+  );
+
+  // 收集所有内容文本用于复制
+  const getAllContentText = (): string => {
+    const parts: string[] = [];
+    
+    if (normalContent) {
+      parts.push(normalContent);
+    }
+    
+    if (reasoning) {
+      parts.push(`推理过程：\n${reasoning}`);
+    }
+    
+    if (tools && tools.length > 0) {
+      parts.push(`调用工具：\n${tools.join('\n')}`);
+    }
+    
+    if (conclusion) {
+      parts.push(`分析结论：\n${conclusion}`);
+    }
+    
+    if (moleculeData?.description) {
+      parts.push(moleculeData.description);
+    }
+    
+    return parts.join('\n\n');
+  };
+
+  const handleCopy = async () => {
+    try {
+      const fullText = getAllContentText();
+      await navigator.clipboard.writeText(fullText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const hasContent = normalContent || hasStructuredContent || (moleculeData && moleculeData.molecules.length > 0);
+  
+  // 追踪是否刚完成流式传输（用于完成动效）
+  const [justCompleted, setJustCompleted] = useState(false);
+  const wasStreamingRef = useRef(isStreaming);
+  
+  useEffect(() => {
+    // 检测从 streaming -> 非 streaming 的转变
+    if (wasStreamingRef.current && !isStreaming && hasContent) {
+      setJustCompleted(true);
+      const timer = setTimeout(() => setJustCompleted(false), 600);
+      return () => clearTimeout(timer);
+    }
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming, hasContent]);
 
   return (
-    <div className="space-y-3">
-      {/* Normal content before structured sections */}
+    <div className={cn(
+      "space-y-3",
+      justCompleted && "animate-completion-glow rounded-lg"
+    )}>
+      {/* 如果正在流式传输但没有任何内容，显示 Thinking... */}
+      {isStreaming && !hasAnyContent && (
+        <ThinkingLoader inline />
+      )}
+
+      {/* Reasoning section - 直接显示，默认折叠 */}
+      {reasoning && (
+        <div className="space-y-2">
+          <ReasoningSection content={reasoning} isStreaming={isStreaming && !normalContent && !conclusion} />
+        </div>
+      )}
+
+      {/* Tools section - 直接显示 */}
+      {tools && tools.length > 0 && (
+        <ToolsSection tools={tools} isStreaming={isStreaming} />
+      )}
+
+      {/* Normal content - 直接显示 */}
       {normalContent && (
-        <div className={cn("text-sm", streaming && "animate-fade-in")}>
+        <div className={cn(
+          "text-sm animate-content-reveal",
+          isStreaming && !conclusion && "streaming-cursor"
+        )}>
           <MarkdownRenderer content={normalContent} />
-          {streaming && (
-            <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse" />
-          )}
         </div>
       )}
 
-      {/* Structured sections */}
-      {hasStructuredContent && (
-        <div className="space-y-3">
-          {reasoning && (
-            <ReasoningSection content={reasoning} isStreaming={streaming && !conclusion} />
-          )}
-          {tools && tools.length > 0 && (
-            <ToolsSection tools={tools} isNew={streaming} />
-          )}
-          {conclusion && (
-            <ConclusionSection content={conclusion} animate={streaming} enableTypewriter={false} />
-          )}
+      {/* Conclusion - 直接显示 */}
+      {conclusion && (
+        <div className={cn(
+          isStreaming && "streaming-cursor"
+        )}>
+          <ConclusionSection content={conclusion} />
         </div>
       )}
 
-      {/* Molecule data visualization */}
+      {/* Molecule data visualization - 直接显示 */}
       {moleculeData && moleculeData.molecules.length > 0 && (
-        <MoleculeResultTabs 
-          data={moleculeData.molecules}
-          description={moleculeData.description}
-        />
+        <div className="animate-content-reveal">
+          <MoleculeResultTabs 
+            data={moleculeData.molecules}
+            description={moleculeData.description}
+          />
+        </div>
       )}
 
-      {/* File attachments */}
+      {/* File attachments - 直接显示 */}
       {files && files.length > 0 && (
-        <FileViewer files={files} />
+        <div className="animate-content-reveal">
+          <FileViewer files={files} />
+        </div>
       )}
 
-      {/* Streaming indicator when no content yet */}
-      {streaming && !normalContent && !hasStructuredContent && (
-        <ThinkingLoader />
+      {/* 底部操作栏 - 复制按钮和分支图标 */}
+      {hasContent && !isStreaming && (
+        <div className="flex items-center justify-start gap-2 mt-4 animate-actions-fade-in">
+          {/* 复制按钮 */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleCopy}
+                className="p-1.5 rounded-md transition-all duration-200 text-slate-400 hover:text-[#123aff] hover:bg-[rgba(18,58,255,0.08)] hover:scale-105 flex items-center justify-center"
+              >
+                {copied ? (
+                  <Check size={16} strokeWidth={2} style={{ color: '#123aff' }} />
+                ) : (
+                  <Copy size={16} strokeWidth={2} />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>{copied ? '已复制' : '复制回答'}</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* 分支图标 */}
+          {messageId && onCreateBranch && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onCreateBranch(messageId)}
+                  className="p-1.5 rounded-md transition-all duration-200 text-slate-400 hover:text-[#123aff] hover:bg-[rgba(18,58,255,0.08)] hover:scale-105 flex items-center justify-center"
+                >
+                  <GitBranch size={16} strokeWidth={2} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>从此处创建分支</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* 存为技能图标 */}
+          {messageId && onSaveAsSkill && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onSaveAsSkill(messageId, getAllContentText())}
+                  className="p-1.5 rounded-md transition-all duration-200 text-slate-400 hover:text-[#123aff] hover:bg-[rgba(18,58,255,0.08)] hover:scale-105 flex items-center justify-center"
+                >
+                  <Wand2 size={16} strokeWidth={2} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>存为技能</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       )}
     </div>
   );

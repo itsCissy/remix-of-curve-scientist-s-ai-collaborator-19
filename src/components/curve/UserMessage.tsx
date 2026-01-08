@@ -1,13 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import UserAvatar from "./UserAvatar";
 import { MessageAttachment } from "@/lib/messageUtils";
-import { FileText, File, Pencil } from "lucide-react";
-import MessageBranchButton from "./MessageBranchButton";
+import { FileText, File, Pencil, Copy, GitBranch } from "lucide-react";
 import { Collaborator } from "@/hooks/useBranches";
 import CollaboratorBadge from "./CollaboratorBadge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface UserMessageProps {
   content: string;
@@ -30,6 +34,7 @@ const UserMessage = ({
 }: UserMessageProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
+  const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const formatFileSize = (bytes: number) => {
@@ -80,22 +85,72 @@ const UserMessage = ({
     }
   };
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   return (
-    <div className="flex justify-end items-start gap-3 animate-fade-in group">
-      {/* Action buttons */}
+    <div className="flex justify-end items-start gap-3 animate-message-enter group">
+      {/* Action buttons - 图标序列：[编辑] [复制] [分支] */}
       {messageId && !isEditing && (
-        <div className="flex-shrink-0 mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex-shrink-0 mt-1 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* 编辑图标 */}
           {onEditMessage && (
-            <button
-              onClick={handleStartEdit}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-              title="编辑消息"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleStartEdit}
+                  className="p-1.5 rounded-md transition-all text-slate-400 hover:text-[#123aff] hover:bg-[rgba(18,58,255,0.08)] flex items-center justify-center"
+                >
+                  <Pencil size={16} strokeWidth={2} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>修改提示</p>
+              </TooltipContent>
+            </Tooltip>
           )}
+
+          {/* 复制提示图标 */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleCopy}
+                className="p-1.5 rounded-md transition-all text-slate-400 hover:text-[#123aff] hover:bg-[rgba(18,58,255,0.08)] flex items-center justify-center"
+              >
+                {copied ? (
+                  <Copy size={16} strokeWidth={2} style={{ color: '#123aff' }} />
+                ) : (
+                  <Copy size={16} strokeWidth={2} />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>{copied ? '已复制' : '复制提示'}</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* 分支图标 */}
           {onCreateBranch && (
-            <MessageBranchButton onCreateBranch={() => onCreateBranch(messageId)} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onCreateBranch(messageId)}
+                  className="p-1.5 rounded-md transition-all text-slate-400 hover:text-[#123aff] hover:bg-[rgba(18,58,255,0.08)] flex items-center justify-center"
+                >
+                  <GitBranch size={16} strokeWidth={2} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>从此处创建分支</p>
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
       )}

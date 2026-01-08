@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Branch, Collaborator } from "@/hooks/useBranches";
+import { useNavigation } from "@/contexts/NavigationContext";
 import { GitBranch, MessageSquare, Trash2, ArrowLeft, ZoomIn, ZoomOut, Maximize2, Plus, Clock, Sparkles, AlertTriangle, MoreHorizontal, Pencil, Copy, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -58,9 +59,320 @@ interface BranchTreeViewProps {
   messageCountByBranch?: Record<string, number>;
   messagesByBranch?: Record<string, { content: string; role: string }[]>;
   onCreateBranch?: (parentBranchId: string, name: string, inheritContext: boolean) => void;
-  onShowFileCenter?: () => void;
-  fileUnreadCount?: number;
+  onOpenFolder?: (branchId: string, branchName: string) => void;
 }
+
+// Card dimensions
+  const CARD_WIDTH = 360;
+  const CARD_HEIGHT = 280;
+  const CARD_GAP_X = 160;
+  const CARD_GAP_Y = 80;
+
+// BranchCard Component - Extracted as separate component
+interface BranchCardProps {
+  node: BranchNode;
+  x: number;
+  y: number;
+  isSelected: boolean;
+  onSelectBranch: (branchId: string) => void;
+  onOpenFolder?: (branchId: string, branchName: string) => void;
+  onRenameBranchClick: (node: BranchNode) => void;
+  onCopyBranchClick: (node: BranchNode) => void;
+  onDeleteBranchClick: (node: BranchNode) => void;
+  onCreateBranchClick: (branchId: string, e: React.MouseEvent) => void;
+  formatDate: (dateString: string) => string;
+}
+
+const BranchCard = ({
+  node,
+  x,
+  y,
+  isSelected,
+  onSelectBranch,
+  onOpenFolder,
+  onRenameBranchClick,
+  onCopyBranchClick,
+  onDeleteBranchClick,
+  onCreateBranchClick,
+  formatDate,
+}: BranchCardProps) => {
+    const isMainBranch = node.is_main;
+    const hasContent = (node.messageCount || 0) > 0;
+
+    return (
+      <div
+        className={cn(
+          "absolute group cursor-pointer transition-all duration-300 ease-out",
+          "rounded-2xl overflow-hidden flex flex-col",
+          "hover:-translate-y-3 hover:shadow-2xl hover:shadow-primary/10",
+          "backdrop-blur-xl",
+          // Unified default state for all cards
+          "bg-card/60 border border-border/40 shadow-lg",
+          // Selected/Active state - applies to any card when selected
+          isSelected && "bg-primary/10 border-2 border-primary/40 shadow-lg shadow-primary/20 ring-2 ring-primary ring-offset-2 ring-offset-background"
+        )}
+        style={{
+          left: x,
+          top: y,
+          width: CARD_WIDTH,
+          height: CARD_HEIGHT,
+        }}
+        onDoubleClick={() => onSelectBranch(node.id)}
+      >
+        {/* Background gradient overlay */}
+        <div className={cn(
+          "absolute inset-0 opacity-60 pointer-events-none",
+          isSelected 
+            ? "bg-gradient-to-br from-primary/15 via-transparent to-primary/5" 
+            : "bg-gradient-to-br from-muted/30 via-transparent to-muted/10"
+        )} />
+        
+        {/* === HEADER === */}
+        <div className={cn(
+          "relative flex items-center justify-between px-4 py-3 shrink-0",
+          isSelected 
+            ? "border-b border-primary/20" 
+            : "border-b border-border/30"
+        )}>
+          <div className="flex items-center gap-3">
+            {/* Branch icon */}
+            <div className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center",
+              "backdrop-blur-sm",
+              isSelected 
+                ? "bg-primary/20 text-primary border border-primary/30" 
+                : "bg-muted/50 text-muted-foreground border border-border/30"
+            )}>
+              {isMainBranch ? <Sparkles className="w-5 h-5" /> : <GitBranch className="w-5 h-5" />}
+            </div>
+            
+            <div className="flex items-center">
+              <span className={cn(
+                "font-bold text-base leading-tight",
+                isSelected ? "text-primary" : "text-foreground"
+              )}>
+                {node.name}
+              </span>
+            </div>
+          </div>
+
+        {/* Right side actions - Folder and More menu */}
+        <div className="flex items-center gap-2">
+          {/* Folder icon - visible on hover */}
+          {onOpenFolder && (
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenFolder(node.id, node.name);
+                  }}
+                  className={cn(
+                    "p-2 rounded-lg transition-all duration-200",
+                    "hover:bg-[rgba(18,58,255,0.08)] hover:scale-110",
+                    "opacity-0 group-hover:opacity-100"
+                  )}
+                  onMouseEnter={(e) => {
+                    const icon = e.currentTarget.querySelector('svg');
+                    if (icon) icon.style.color = '#123aff';
+                  }}
+                  onMouseLeave={(e) => {
+                    const icon = e.currentTarget.querySelector('svg');
+                    if (icon) icon.style.color = '#52525b';
+                  }}
+                >
+                  <Folder className="w-4 h-4" style={{ color: '#52525b' }} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="z-[9999]">查看文件夹</TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* More menu - visible on hover */}
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    onClick={(e) => e.stopPropagation()}
+                    className={cn(
+                      "p-2 rounded-lg transition-all duration-200",
+                      "hover:bg-[rgba(18,58,255,0.08)] hover:scale-110",
+                      "opacity-0 group-hover:opacity-100"
+                    )}
+                    onMouseEnter={(e) => {
+                      const icon = e.currentTarget.querySelector('svg');
+                      if (icon) icon.style.color = '#123aff';
+                    }}
+                    onMouseLeave={(e) => {
+                      const icon = e.currentTarget.querySelector('svg');
+                      if (icon) icon.style.color = '#52525b';
+                    }}
+                  >
+                    <MoreHorizontal className="w-4 h-4" style={{ color: '#52525b' }} />
+                  </button>
+                </DropdownMenuTrigger>
+            <DropdownMenuContent 
+              align="end" 
+              className="w-48 bg-popover border border-border shadow-lg z-50"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DropdownMenuItem 
+                onClick={() => onRenameBranchClick(node)}
+                className="gap-2 cursor-pointer text-slate-700"
+              >
+                <Pencil className="w-4 h-4 text-slate-500" />
+                重命名
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => onCopyBranchClick(node)}
+                className="gap-2 cursor-pointer text-slate-700"
+              >
+                <Copy className="w-4 h-4 text-slate-500" />
+                复制分支
+              </DropdownMenuItem>
+              {!node.is_main && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => onDeleteBranchClick(node)}
+                    className="gap-2 cursor-pointer text-slate-700"
+                  >
+                    <Trash2 className="w-4 h-4 text-slate-500" />
+                    删除分支
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+            </TooltipTrigger>
+            <TooltipContent className="z-[9999]">更多操作</TooltipContent>
+          </Tooltip>
+        </div>
+        </div>
+        
+        {/* === CONTENT === */}
+        <div className="relative px-4 py-3 flex-1 flex flex-col gap-3 overflow-hidden">
+          {/* Core Conclusion Summary */}
+          {hasContent ? (
+            <>
+              <div className="flex-1">
+                <p className="text-[11px] text-muted-foreground/70 uppercase tracking-wider font-medium mb-1.5">
+                  核心结论
+                </p>
+                <p className={cn(
+                  "text-sm leading-relaxed line-clamp-3",
+                  node.summary ? "text-foreground/80" : "text-muted-foreground/50 italic"
+                )}>
+                  {node.summary || "暂无结论摘要"}
+                </p>
+              </div>
+              
+              {/* Key Questions Preview */}
+              {node.questions && node.questions.length > 0 && (
+                <div className="shrink-0">
+                  <p className="text-[11px] text-muted-foreground/70 uppercase tracking-wider font-medium mb-2">
+                    关键问题
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {node.questions.slice(0, 3).map((question, idx) => (
+                      <span 
+                        key={idx}
+                        className={cn(
+                          "inline-flex items-center px-2.5 py-1 rounded-full text-xs",
+                          "bg-muted/50 text-muted-foreground border border-border/30",
+                          "max-w-[140px] truncate"
+                        )}
+                        title={question}
+                      >
+                        {question}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            // Empty state
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
+              <div className={cn(
+                "w-12 h-12 rounded-xl flex items-center justify-center mb-3",
+                "bg-muted/30 border border-border/30"
+              )}>
+                <MessageSquare className="w-6 h-6 text-muted-foreground/40" />
+              </div>
+              <p className="text-sm text-muted-foreground/60 italic">
+                暂无会话内容
+              </p>
+              <p className="text-xs text-muted-foreground/40 mt-1">
+                双击进入开始对话
+              </p>
+            </div>
+          )}
+        </div>
+        
+        {/* === ACTION / FOOTER === */}
+        <div className={cn(
+          "relative flex items-center justify-between px-4 py-2.5 shrink-0",
+          "border-t",
+          isSelected ? "border-primary/15 bg-primary/5" : "border-border/20 bg-muted/20"
+        )}>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              <span>{formatDate(node.created_at)}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>{node.messageCount || 0} 条消息</span>
+            </div>
+          </div>
+          
+          {node.children.length > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">
+              <GitBranch className="w-3 h-3" />
+              <span>{node.children.length} 个分支</span>
+            </div>
+          )}
+        </div>
+
+        {/* Create branch button - visible on hover */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+            onClick={(e) => onCreateBranchClick(node.id, e)}
+              className={cn(
+                "absolute -right-3 top-1/2 -translate-y-1/2",
+                "w-8 h-8 rounded-full",
+                "bg-primary text-primary-foreground",
+                "flex items-center justify-center",
+                "shadow-lg shadow-primary/30",
+                "opacity-0 group-hover:opacity-100 group-hover:translate-x-0 translate-x-2",
+                "transition-all duration-300",
+                "hover:scale-110 hover:shadow-xl"
+              )}
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>创建分支</p>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Selected indicator */}
+        {isSelected && (
+          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-gradient-to-b from-primary via-primary to-primary/50 rounded-r-full" />
+        )}
+        
+        {/* Hover glow effect */}
+        <div className={cn(
+          "absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none",
+          isSelected ? "shadow-[inset_0_0_30px_rgba(var(--primary),0.1)]" : "shadow-[inset_0_0_30px_rgba(255,255,255,0.05)]"
+        )} />
+      </div>
+    );
+};
 
 const BranchTreeView = ({
   branches,
@@ -75,15 +387,18 @@ const BranchTreeView = ({
   messageCountByBranch = {},
   messagesByBranch = {},
   onCreateBranch,
-  onShowFileCenter,
-  fileUnreadCount = 0,
+  onOpenFolder,
 }: BranchTreeViewProps) => {
+  const { isFolderOpen, contentWidth } = useNavigation();
+  
   // Canvas pan and zoom state
   const [scale, setScale] = useState(0.85);
   const [position, setPosition] = useState({ x: 80, y: 80 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
+  const canvasContentRef = useRef<HTMLDivElement>(null);
+  const previousFolderOpenRef = useRef<boolean>(false);
   
   // Create branch dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -201,6 +516,88 @@ const BranchTreeView = ({
     setPosition({ x: 80, y: 80 });
   };
 
+  // Fit view to center selected node when folder opens/closes
+  const fitViewToSelectedNode = useCallback(() => {
+    if (!currentBranchId || !canvasRef.current || !canvasContentRef.current) return;
+    
+    // Find the selected node's position by recalculating layout
+    const positions: { node: BranchNode; x: number; y: number }[] = [];
+    const layoutNode = (node: BranchNode, depth: number, startY: number): number => {
+      const x = depth * (CARD_WIDTH + CARD_GAP_X);
+      
+      if (node.children.length === 0) {
+        positions.push({ node, x, y: startY });
+        return startY + CARD_HEIGHT + CARD_GAP_Y;
+      }
+      
+      let childY = startY;
+      const childPositions: number[] = [];
+      
+      node.children.forEach(child => {
+        const childStart = childY;
+        childY = layoutNode(child, depth + 1, childY);
+        const childPos = positions.find(p => p.node.id === child.id);
+        if (childPos) {
+          childPositions.push(childPos.y);
+        }
+      });
+      
+      let parentY = startY;
+      if (childPositions.length > 0) {
+        const avgChildY = childPositions.reduce((a, b) => a + b, 0) / childPositions.length;
+        parentY = avgChildY;
+        parentY = Math.max(startY, parentY);
+      }
+      
+      positions.push({ node, x, y: parentY });
+      return childY;
+    };
+    
+    let currentY = 0;
+    buildTree.forEach(root => {
+      currentY = layoutNode(root, 0, currentY);
+    });
+    
+    const nodePos = positions.find(p => p.node.id === currentBranchId);
+    if (!nodePos) return;
+    
+    // Get canvas container dimensions
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const containerWidth = canvasRect.width;
+    const containerHeight = canvasRect.height;
+    
+    // Calculate center position for the node
+    const nodeCenterX = nodePos.x + CARD_WIDTH / 2;
+    const nodeCenterY = nodePos.y + CARD_HEIGHT / 2;
+    
+    // Desired position: node center should be at container center
+    const scaledNodeX = nodeCenterX * scale;
+    const scaledNodeY = nodeCenterY * scale;
+    
+    // Calculate new position to center the node
+    const newX = containerWidth / 2 - scaledNodeX;
+    const newY = containerHeight / 2 - scaledNodeY;
+    
+    // Smooth transition
+    setPosition({ x: newX, y: newY });
+  }, [currentBranchId, buildTree, scale]);
+  
+  // Watch for folder open/close changes
+  useEffect(() => {
+    if (previousFolderOpenRef.current !== isFolderOpen) {
+      previousFolderOpenRef.current = isFolderOpen;
+      // Delay to allow layout to settle
+      setTimeout(() => {
+        fitViewToSelectedNode();
+      }, 100);
+    }
+  }, [isFolderOpen, fitViewToSelectedNode]);
+
+  // 当左侧内容宽度变化时，重新居中选中分支
+  useEffect(() => {
+    fitViewToSelectedNode();
+  }, [contentWidth, fitViewToSelectedNode]);
+
   // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -281,255 +678,6 @@ const BranchTreeView = ({
     }
   };
 
-  // Card dimensions - increased for new layout
-  const CARD_WIDTH = 360;
-  const CARD_HEIGHT = 280;
-  const CARD_GAP_X = 160;
-  const CARD_GAP_Y = 80;
-
-  // Render single branch card with Header -> Content -> Action structure
-  const renderCard = (node: BranchNode, x: number, y: number) => {
-    const isSelected = node.id === currentBranchId;
-    const isMainBranch = node.is_main;
-    const hasContent = (node.messageCount || 0) > 0;
-
-    return (
-      <div
-        key={node.id}
-        className={cn(
-          "absolute group cursor-pointer transition-all duration-300 ease-out",
-          "rounded-2xl overflow-hidden flex flex-col",
-          // Enhanced hover effects
-          "hover:-translate-y-3 hover:shadow-2xl hover:shadow-primary/10",
-          // Glassmorphism effect
-          "backdrop-blur-xl",
-          isMainBranch 
-            ? "bg-primary/10 border-2 border-primary/40 shadow-lg shadow-primary/20" 
-            : "bg-card/60 border border-border/40 shadow-lg",
-          isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
-        )}
-        style={{
-          left: x,
-          top: y,
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-        }}
-        onDoubleClick={() => onSelectBranch(node.id)}
-      >
-        {/* Background gradient overlay */}
-        <div className={cn(
-          "absolute inset-0 opacity-60 pointer-events-none",
-          isMainBranch 
-            ? "bg-gradient-to-br from-primary/15 via-transparent to-primary/5" 
-            : "bg-gradient-to-br from-muted/30 via-transparent to-muted/10"
-        )} />
-        
-        {/* === HEADER === */}
-        <div className={cn(
-          "relative flex items-center justify-between px-4 py-3 shrink-0",
-          isMainBranch 
-            ? "border-b border-primary/20" 
-            : "border-b border-border/30"
-        )}>
-          <div className="flex items-center gap-3">
-            {/* Branch icon */}
-            <div className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center",
-              "backdrop-blur-sm",
-              isMainBranch 
-                ? "bg-primary/20 text-primary border border-primary/30" 
-                : "bg-muted/50 text-muted-foreground border border-border/30"
-            )}>
-              {isMainBranch ? <Sparkles className="w-5 h-5" /> : <GitBranch className="w-5 h-5" />}
-            </div>
-            
-            <div className="flex flex-col">
-              <span className={cn(
-                "font-bold text-base leading-tight",
-                isMainBranch ? "text-primary" : "text-foreground"
-              )}>
-                {node.name}
-              </span>
-              {isMainBranch && (
-                <span className="text-[10px] text-primary/70 font-medium">
-                  主线会话
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* More menu - visible on hover */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className={cn(
-                  "p-2 rounded-lg transition-all duration-200",
-                  "hover:bg-muted/50 hover:scale-110",
-                  "opacity-0 group-hover:opacity-100"
-                )}
-              >
-                <MoreHorizontal className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent 
-              align="end" 
-              className="w-48 bg-popover border border-border shadow-lg z-50"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <DropdownMenuItem 
-                onClick={() => handleRenameBranchClick(node)}
-                className="gap-2 cursor-pointer"
-              >
-                <Pencil className="w-4 h-4" />
-                重命名
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => handleCopyBranchClick(node)}
-                className="gap-2 cursor-pointer"
-              >
-                <Copy className="w-4 h-4" />
-                复制分支
-              </DropdownMenuItem>
-              {!node.is_main && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={() => handleDeleteBranchClick(node)}
-                    className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    删除分支
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        
-        {/* === CONTENT === */}
-        <div className="relative px-4 py-3 flex-1 flex flex-col gap-3 overflow-hidden">
-          {/* Core Conclusion Summary */}
-          {hasContent ? (
-            <>
-              <div className="flex-1">
-                <p className="text-[11px] text-muted-foreground/70 uppercase tracking-wider font-medium mb-1.5">
-                  核心结论
-                </p>
-                <p className={cn(
-                  "text-sm leading-relaxed line-clamp-3",
-                  node.summary ? "text-foreground/80" : "text-muted-foreground/50 italic"
-                )}>
-                  {node.summary || "暂无结论摘要"}
-                </p>
-              </div>
-              
-              {/* Key Questions Preview */}
-              {node.questions && node.questions.length > 0 && (
-                <div className="shrink-0">
-                  <p className="text-[11px] text-muted-foreground/70 uppercase tracking-wider font-medium mb-2">
-                    关键问题
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {node.questions.slice(0, 3).map((question, idx) => (
-                      <span 
-                        key={idx}
-                        className={cn(
-                          "inline-flex items-center px-2.5 py-1 rounded-full text-xs",
-                          "bg-muted/50 text-muted-foreground border border-border/30",
-                          "max-w-[140px] truncate"
-                        )}
-                        title={question}
-                      >
-                        {question}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            // Empty state
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
-              <div className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center mb-3",
-                "bg-muted/30 border border-border/30"
-              )}>
-                <MessageSquare className="w-6 h-6 text-muted-foreground/40" />
-              </div>
-              <p className="text-sm text-muted-foreground/60 italic">
-                暂无会话内容
-              </p>
-              <p className="text-xs text-muted-foreground/40 mt-1">
-                双击进入开始对话
-              </p>
-            </div>
-          )}
-        </div>
-        
-        {/* === ACTION / FOOTER === */}
-        <div className={cn(
-          "relative flex items-center justify-between px-4 py-2.5 shrink-0",
-          "border-t",
-          isMainBranch ? "border-primary/15 bg-primary/5" : "border-border/20 bg-muted/20"
-        )}>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5" />
-              <span>{formatDate(node.created_at)}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>{node.messageCount || 0} 条消息</span>
-            </div>
-          </div>
-          
-          {node.children.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">
-              <GitBranch className="w-3 h-3" />
-              <span>{node.children.length} 个分支</span>
-            </div>
-          )}
-        </div>
-
-        {/* Create branch button - visible on hover */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={(e) => handleCreateBranchClick(node.id, e)}
-              className={cn(
-                "absolute -right-3 top-1/2 -translate-y-1/2",
-                "w-8 h-8 rounded-full",
-                "bg-primary text-primary-foreground",
-                "flex items-center justify-center",
-                "shadow-lg shadow-primary/30",
-                "opacity-0 group-hover:opacity-100 group-hover:translate-x-0 translate-x-2",
-                "transition-all duration-300",
-                "hover:scale-110 hover:shadow-xl"
-              )}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            <p>创建分支</p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Selected indicator */}
-        {isSelected && (
-          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-gradient-to-b from-primary via-primary to-primary/50 rounded-r-full" />
-        )}
-        
-        {/* Hover glow effect */}
-        <div className={cn(
-          "absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none",
-          isMainBranch ? "shadow-[inset_0_0_30px_rgba(var(--primary),0.1)]" : "shadow-[inset_0_0_30px_rgba(255,255,255,0.05)]"
-        )} />
-      </div>
-    );
-  };
-
   // Render tree with positions
   const renderBranchTree = () => {
     if (buildTree.length === 0) {
@@ -608,8 +756,16 @@ const BranchTreeView = ({
       maxY = Math.max(maxY, p.y + CARD_HEIGHT + 150);
     });
 
+    const computedMinWidth = Math.max(
+      480,
+      Math.min((contentWidth || 960) - 40, 1200)
+    );
+
     return (
-      <div className="relative" style={{ width: maxX, height: maxY, minWidth: 600, minHeight: 400 }}>
+      <div
+        className="relative"
+        style={{ width: maxX, height: maxY, minWidth: computedMinWidth, minHeight: 400 }}
+      >
         {/* SVG connections with flow animation */}
         <svg 
           className="absolute inset-0 pointer-events-none" 
@@ -618,9 +774,9 @@ const BranchTreeView = ({
           <defs>
             {/* Main branch gradient - XtalPi Blue gradient */}
             <linearGradient id="mainConnectionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#1609a0" stopOpacity="0.8" />
+              <stop offset="0%" stopColor="#123aff" stopOpacity="0.8" />
               <stop offset="50%" stopColor="#123aff" stopOpacity="0.6" />
-              <stop offset="100%" stopColor="#00ffff" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#123aff" stopOpacity="0.4" />
             </linearGradient>
             
             {/* Normal branch gradient */}
@@ -632,7 +788,7 @@ const BranchTreeView = ({
 
             {/* Flow animation pattern - XtalPi Blue */}
             <pattern id="flowPattern" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform={`translate(${-animationOffset * 2}, 0)`}>
-              <circle cx="2" cy="10" r="1.5" fill="#00ffff" opacity="0.8" />
+              <circle cx="2" cy="10" r="1.5" fill="#123aff" opacity="0.8" />
             </pattern>
           </defs>
           
@@ -678,7 +834,7 @@ const BranchTreeView = ({
                   cx={conn.toX} 
                   cy={conn.toY} 
                   r="5" 
-                  fill={conn.isMain ? "#00ffff" : "hsl(var(--muted-foreground))"} 
+                  fill={conn.isMain ? "#123aff" : "hsl(var(--muted-foreground))"} 
                   opacity="0.7"
                 />
               </g>
@@ -687,102 +843,33 @@ const BranchTreeView = ({
         </svg>
         
         {/* Render cards */}
-        {positions.map(({ node, x, y }) => renderCard(node, x, y))}
+        {positions.map(({ node, x, y }) => (
+          <BranchCard
+            key={node.id}
+            node={node}
+            x={x}
+            y={y}
+            isSelected={node.id === currentBranchId}
+            onSelectBranch={onSelectBranch}
+            onOpenFolder={onOpenFolder}
+            onRenameBranchClick={handleRenameBranchClick}
+            onCopyBranchClick={handleCopyBranchClick}
+            onDeleteBranchClick={handleDeleteBranchClick}
+            onCreateBranchClick={handleCreateBranchClick}
+            formatDate={formatDate}
+          />
+        ))}
       </div>
     );
   };
 
   return (
-    <div className="flex-1 flex flex-col h-screen bg-background overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm z-10">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            返回对话
-          </Button>
-          <div className="h-5 w-px bg-border" />
-          {/* File Center button - moved to left side */}
-          {onShowFileCenter && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onShowFileCenter}
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-medium relative"
-                >
-                  <Folder className="w-4 h-4" />
-                  <span>文件夹</span>
-                  {fileUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 bg-destructive text-destructive-foreground text-[10px] font-semibold rounded-full flex items-center justify-center">
-                      {fileUnreadCount > 99 ? "99+" : fileUnreadCount}
-                    </span>
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>查看文件夹</TooltipContent>
-            </Tooltip>
-          )}
-          <div className="h-5 w-px bg-border" />
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <GitBranch className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-base font-semibold text-foreground">分支视图</h1>
-              <p className="text-xs text-muted-foreground">{branches.length} 个会话分支</p>
-            </div>
-          </div>
-        </div>
-        
-        {/* Right side controls */}
-        <div className="flex items-center gap-3">
-          
-          {/* Zoom controls */}
-          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 border border-border/30">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomOut}>
-                  <ZoomOut className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>缩小</TooltipContent>
-            </Tooltip>
-            
-            <span className="text-xs font-medium text-muted-foreground w-12 text-center">
-              {Math.round(scale * 100)}%
-            </span>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomIn}>
-                  <ZoomIn className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>放大</TooltipContent>
-            </Tooltip>
-          </div>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetView}>
-                <Maximize2 className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>重置视图</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-      
-      {/* Infinite canvas */}
+    <div className="relative w-full h-full bg-background overflow-hidden flex-1 min-w-0 transition-all duration-300">
+      {/* Infinite canvas - Full height */}
       <div 
         ref={canvasRef}
         className={cn(
-          "flex-1 overflow-hidden relative",
+          "absolute inset-0 overflow-hidden",
           isDragging ? "cursor-grabbing" : "cursor-grab"
         )}
         onMouseDown={handleMouseDown}
@@ -809,18 +896,126 @@ const BranchTreeView = ({
         
         {/* Canvas content */}
         <div
-          className="absolute origin-top-left transition-transform duration-100"
+          ref={canvasContentRef}
+          className="absolute origin-top-left transition-transform duration-300"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
           }}
         >
           {renderBranchTree()}
         </div>
+
+        {/* Status Floating Layer - Top Left */}
+        <div className="absolute top-4 left-4 z-20 pointer-events-none">
+          <div className="bg-white/80 backdrop-blur-md rounded-lg px-3 py-2 border border-border/50 shadow-sm">
+            <p className="text-xs font-medium text-foreground">
+              {branches.length} 个会话分支
+            </p>
+        </div>
       </div>
 
-      {/* Hint text */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs text-muted-foreground/60 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-full border border-border/30">
+        {/* Control Floating Layer - Top Right */}
+        <div className="absolute top-4 right-4 z-20 pointer-events-auto">
+          <div className="bg-white/90 backdrop-blur-md rounded-lg border border-border/50 shadow-lg p-1.5 flex items-center gap-1">
+            {/* Zoom controls */}
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 group"
+                  style={{ 
+                    backgroundColor: 'transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(18, 58, 255, 0.08)';
+                    const icon = e.currentTarget.querySelector('svg');
+                    if (icon) icon.style.color = '#123aff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    const icon = e.currentTarget.querySelector('svg');
+                    if (icon) icon.style.color = '#52525b';
+                  }}
+                  onClick={zoomOut}
+                >
+                  <ZoomOut className="w-4 h-4" style={{ color: '#52525b' }} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>缩小</TooltipContent>
+            </Tooltip>
+            
+            <span 
+              className="text-xs font-medium w-12 text-center transition-colors"
+              style={{ color: scale !== 0.85 ? '#123aff' : '#52525b' }}
+            >
+              {Math.round(scale * 100)}%
+            </span>
+            
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 group"
+                  style={{ 
+                    backgroundColor: 'transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(18, 58, 255, 0.08)';
+                    const icon = e.currentTarget.querySelector('svg');
+                    if (icon) icon.style.color = '#123aff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    const icon = e.currentTarget.querySelector('svg');
+                    if (icon) icon.style.color = '#52525b';
+                  }}
+                  onClick={zoomIn}
+                >
+                  <ZoomIn className="w-4 h-4" style={{ color: '#52525b' }} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>放大</TooltipContent>
+            </Tooltip>
+
+            <div className="w-px h-5 bg-border mx-0.5" />
+            
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 group"
+                  style={{ 
+                    backgroundColor: 'transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(18, 58, 255, 0.08)';
+                    const icon = e.currentTarget.querySelector('svg');
+                    if (icon) icon.style.color = '#123aff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    const icon = e.currentTarget.querySelector('svg');
+                    if (icon) icon.style.color = '#52525b';
+                  }}
+                  onClick={resetView}
+                >
+                  <Maximize2 className="w-4 h-4" style={{ color: '#52525b' }} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>重置视图</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+
+        {/* Hint text - Bottom center */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+          <div className="text-xs text-muted-foreground/60 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full border border-border/30 shadow-sm">
         双击卡片进入对话 · 拖拽画布移动 · Ctrl + 滚轮缩放
+          </div>
+        </div>
       </div>
 
       {/* Create Branch Dialog */}
@@ -864,7 +1059,11 @@ const BranchTreeView = ({
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+            <Button
+              variant="outline"
+              className="bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+              onClick={() => setShowCreateDialog(false)}
+            >
               取消
             </Button>
             <Button 
@@ -911,7 +1110,7 @@ const BranchTreeView = ({
             <AlertDialogCancel className="px-4">取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4 gap-2"
+              className="px-4 gap-2"
             >
               <Trash2 className="w-4 h-4" />
               确认删除
@@ -948,7 +1147,11 @@ const BranchTreeView = ({
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
+            <Button
+              variant="outline"
+              className="bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+              onClick={() => setShowRenameDialog(false)}
+            >
               取消
             </Button>
             <Button 

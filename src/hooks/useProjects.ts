@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -29,6 +29,9 @@ export interface Message {
 }
 
 export const useProjects = () => {
+  // Debug-only: identify hook instances to detect multiple copies across layout/pages
+  const instanceIdRef = useRef<string>(`useProjects#${Math.random().toString(36).slice(2, 7)}`);
+  const getInstanceId = () => instanceIdRef.current;
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
@@ -73,8 +76,11 @@ export const useProjects = () => {
     context_path?: string;
     selected_agents?: string[];
     tags?: string[];
+    selected_skills?: string[];
+    uploaded_files?: any[];
   }): Promise<Project | null> => {
     try {
+      console.log("[useProjects] createProject invoked", getInstanceId(), projectData);
       // First, deactivate all other projects
       await supabase
         .from("projects")
@@ -92,6 +98,8 @@ export const useProjects = () => {
           selected_agents: projectData.selected_agents || ["xtalpi"],
           tags: projectData.tags || [],
           is_active: true,
+          // Note: selected_skills and uploaded_files are stored in separate tables
+          // They will be handled by the UI layer after project creation
         })
         .select()
         .single();
@@ -100,6 +108,19 @@ export const useProjects = () => {
 
       setProjects(prev => [data, ...prev.map(p => ({ ...p, is_active: false }))]);
       setActiveProject(data);
+      console.log("[useProjects] createProject success", getInstanceId(), data);
+      
+      // Decouple new project from old session: clear any cached conversation state
+      try {
+        // Clear localStorage/sessionStorage if any conversation ID is cached
+        localStorage.removeItem("last_active_conversation_id");
+        sessionStorage.removeItem("last_active_conversation_id");
+        localStorage.removeItem("activeConversationId");
+        sessionStorage.removeItem("activeConversationId");
+      } catch (e) {
+        // Ignore storage errors
+      }
+      
       toast.success(`项目 "${projectData.name}" 创建成功`);
       return data;
     } catch (error) {
@@ -163,6 +184,7 @@ export const useProjects = () => {
   // Set active project
   const setActive = async (id: string): Promise<boolean> => {
     try {
+      console.log("[useProjects] setActive invoked", getInstanceId(), id);
       // Deactivate all
       await supabase
         .from("projects")
@@ -186,6 +208,13 @@ export const useProjects = () => {
         setActiveProject({ ...project, is_active: true });
       }
       
+      // Clear cached conversation state when switching projects
+      localStorage.removeItem("last_active_conversation_id");
+      sessionStorage.removeItem("last_active_conversation_id");
+      localStorage.removeItem("activeConversationId");
+      sessionStorage.removeItem("activeConversationId");
+      
+      console.log("[useProjects] setActive success", getInstanceId(), id);
       return true;
     } catch (error) {
       console.error("Error setting active project:", error);
@@ -195,6 +224,7 @@ export const useProjects = () => {
 
   // Initial fetch
   useEffect(() => {
+    console.log("[useProjects] mounted", getInstanceId());
     fetchProjects();
   }, [fetchProjects]);
 
@@ -210,6 +240,7 @@ export const useProjects = () => {
           table: "projects",
         },
         () => {
+          console.log("[useProjects] realtime event", getInstanceId());
           fetchProjects();
         }
       )
@@ -217,6 +248,7 @@ export const useProjects = () => {
 
     return () => {
       supabase.removeChannel(channel);
+      console.log("[useProjects] unmounted", getInstanceId());
     };
   }, [fetchProjects]);
 
@@ -236,7 +268,7 @@ export const useMessages = (projectId: string | null) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch messages for a project
+  // Fetch messages for a project - strict project ID filtering
   const fetchMessages = useCallback(async () => {
     if (!projectId) {
       setMessages([]);
@@ -244,21 +276,48 @@ export const useMessages = (projectId: string | null) => {
     }
 
     setIsLoading(true);
+    const currentProjectId = projectId; // Capture projectId for validation
+    
     try {
+      // Explicitly bind projectId in API request
       const { data, error } = await supabase
         .from("messages")
         .select("*")
-        .eq("project_id", projectId)
+        .eq("project_id", currentProjectId) // API parameter binding
         .order("created_at", { ascending: true });
 
       if (error) throw error;
       
-      // Type assertion since we know the structure
-      setMessages((data || []) as Message[]);
+      // Frontend secondary interception: force filter by projectId
+      // Frontend secondary interception: force filter by projectId
+      // Ensure messages not belonging to current project never enter state
+      const projectMessages = (data || []).filter((m: any) => {
+        // Strict validation: reject messages that don't match current projectId
+        if (m.project_id !== currentProjectId) {
+          console.warn(`Rejecting message ${m.id} - project_id mismatch: ${m.project_id} !== ${currentProjectId}`);
+          return false;
+        }
+        return true;
+      });
+      
+      // Double-check: ensure all messages belong to current project
+      const validMessages = projectMessages.filter((m: any) => m.project_id === currentProjectId);
+      
+      // Only update if projectId hasn't changed during fetch
+      if (currentProjectId === projectId) {
+        setMessages(validMessages as Message[]);
+      }
     } catch (error) {
       console.error("Error fetching messages:", error);
+      // Only clear messages if still on same project
+      if (currentProjectId === projectId) {
+        setMessages([]);
+      }
     } finally {
-      setIsLoading(false);
+      // Only update loading state if still on same project
+      if (currentProjectId === projectId) {
+        setIsLoading(false);
+      }
     }
   }, [projectId]);
 
@@ -287,6 +346,13 @@ export const useMessages = (projectId: string | null) => {
       if (error) throw error;
       
       const typedData = data as Message;
+      
+      // Validate project_id before adding to state
+      if (typedData.project_id !== projectId) {
+        console.warn(`Rejecting addMessage - project_id mismatch: ${typedData.project_id} !== ${projectId}`);
+        return null;
+      }
+      
       setMessages(prev => [...prev, typedData]);
       return typedData;
     } catch (error) {
@@ -317,13 +383,30 @@ export const useMessages = (projectId: string | null) => {
     }
   };
 
+  // Force reset messages when projectId changes - strict project ID scoping
   useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
+    // Immediately clear messages when projectId changes to prevent stale data
+    setMessages([]);
+    setIsLoading(false);
+    
+    // Clear conversation IDs from storage when project changes
+    localStorage.removeItem("last_active_conversation_id");
+    sessionStorage.removeItem("last_active_conversation_id");
+    localStorage.removeItem("activeConversationId");
+    sessionStorage.removeItem("activeConversationId");
+    
+    // Then fetch messages for the new project
+    if (projectId) {
+      fetchMessages();
+    }
+  }, [projectId, fetchMessages]);
 
   // Set up realtime subscription for all events (INSERT, UPDATE, DELETE)
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId) {
+      setMessages([]);
+      return;
+    }
 
     const channel = supabase
       .channel(`messages-${projectId}`)
@@ -336,9 +419,17 @@ export const useMessages = (projectId: string | null) => {
           filter: `project_id=eq.${projectId}`,
         },
         (payload) => {
+          // Strict client-side validation: only process messages for current projectId
           if (payload.eventType === "INSERT") {
             const newMessage = payload.new as Message;
+            // API payload guard: validate project_id matches current projectId
+            if (newMessage.project_id !== projectId) {
+              console.warn(`Rejecting realtime INSERT - project_id mismatch: ${newMessage.project_id} !== ${projectId}`);
+              return;
+            }
             setMessages(prev => {
+              // Additional check: ensure message belongs to current project
+              if (newMessage.project_id !== projectId) return prev;
               if (prev.some(m => m.id === newMessage.id)) return prev;
               return [...prev, newMessage];
             });
@@ -347,7 +438,18 @@ export const useMessages = (projectId: string | null) => {
             setMessages(prev => prev.filter(m => m.id !== deletedId));
           } else if (payload.eventType === "UPDATE") {
             const updatedMessage = payload.new as Message;
-            setMessages(prev => prev.map(m => m.id === updatedMessage.id ? updatedMessage : m));
+            // API payload guard: validate project_id matches current projectId
+            if (updatedMessage.project_id !== projectId) {
+              console.warn(`Rejecting realtime UPDATE - project_id mismatch: ${updatedMessage.project_id} !== ${projectId}`);
+              return;
+            }
+            setMessages(prev => prev.map(m => {
+              // Additional validation: only update if project_id matches
+              if (m.id === updatedMessage.id && updatedMessage.project_id === projectId) {
+                return updatedMessage;
+              }
+              return m;
+            }));
           }
         }
       )

@@ -47,10 +47,10 @@ const ProjectItem = ({
       <Tooltip delayDuration={0}>
         <TooltipTrigger asChild>
           <div
-            className={`w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 mx-auto ${
+            className={`w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-colors duration-200 mx-auto ${
               isActive
-                ? "bg-primary/10 text-foreground"
-                : "hover:bg-curve-hover text-muted-foreground hover:text-foreground"
+                ? "bg-xtalpi-blue/10 text-xtalpi-blue"
+                : "hover:bg-slate-200/60 text-muted-foreground hover:text-foreground"
             }`}
             onClick={onOpen}
           >
@@ -69,10 +69,10 @@ const ProjectItem = ({
 
   return (
     <div
-      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 group ${
+      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors duration-200 group ${
         isActive
-          ? "bg-primary/10 text-foreground"
-          : "hover:bg-curve-hover text-muted-foreground hover:text-foreground"
+          ? "bg-xtalpi-blue/10 text-xtalpi-blue"
+          : "hover:bg-slate-200/60 text-muted-foreground hover:text-foreground"
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -92,12 +92,12 @@ const ProjectItem = ({
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
           <button
-            className={`p-1 rounded hover:bg-background/50 transition-opacity duration-200 ${
+            className={`p-1 rounded transition-opacity duration-200 ${
               isHovered || menuOpen ? "opacity-100" : "opacity-0"
             }`}
             onClick={(e) => e.stopPropagation()}
           >
-            <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+            <MoreHorizontal className="w-4 h-4 text-slate-400 hover:text-slate-700 transition-colors duration-200" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
@@ -106,9 +106,9 @@ const ProjectItem = ({
               e.stopPropagation();
               onOpen?.();
             }}
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer text-slate-700"
           >
-            <FolderOpen className="w-4 h-4" />
+            <FolderOpen className="w-4 h-4 text-slate-500" />
             <span>打开项目</span>
           </DropdownMenuItem>
           
@@ -119,9 +119,9 @@ const ProjectItem = ({
               e.stopPropagation();
               onRename?.();
             }}
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer text-slate-700"
           >
-            <Pencil className="w-4 h-4" />
+            <Pencil className="w-4 h-4 text-slate-500" />
             <span>重命名</span>
           </DropdownMenuItem>
           
@@ -130,9 +130,9 @@ const ProjectItem = ({
               e.stopPropagation();
               onCopy?.();
             }}
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer text-slate-700"
           >
-            <Copy className="w-4 h-4" />
+            <Copy className="w-4 h-4 text-slate-500" />
             <span>复制项目</span>
           </DropdownMenuItem>
           
@@ -141,9 +141,9 @@ const ProjectItem = ({
               e.stopPropagation();
               onFavorite?.();
             }}
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer text-slate-700"
           >
-            <Star className="w-4 h-4" />
+            <Star className="w-4 h-4 text-slate-500" />
             <span>添加到收藏</span>
           </DropdownMenuItem>
           
@@ -154,9 +154,9 @@ const ProjectItem = ({
               e.stopPropagation();
               onShare?.();
             }}
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer text-slate-700"
           >
-            <Share2 className="w-4 h-4" />
+            <Share2 className="w-4 h-4 text-slate-500" />
             <span>分享项目</span>
           </DropdownMenuItem>
           
@@ -165,9 +165,9 @@ const ProjectItem = ({
               e.stopPropagation();
               onExport?.();
             }}
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer text-slate-700"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-4 h-4 text-slate-500" />
             <span>导出项目</span>
           </DropdownMenuItem>
           
@@ -178,9 +178,9 @@ const ProjectItem = ({
               e.stopPropagation();
               onDelete?.();
             }}
-            className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+            className="flex items-center gap-2 cursor-pointer text-slate-700"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4 text-slate-500" />
             <span>删除项目</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
