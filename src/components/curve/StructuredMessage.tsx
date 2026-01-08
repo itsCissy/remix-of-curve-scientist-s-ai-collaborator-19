@@ -13,54 +13,30 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// Typewriter hook for character-by-character display
-const useTypewriter = (text: string, speed: number = 20, enabled: boolean = true) => {
-  const [displayedText, setDisplayedText] = useState("");
-  const [isComplete, setIsComplete] = useState(false);
-
-  useEffect(() => {
-    if (!enabled) {
-      setDisplayedText(text);
-      setIsComplete(true);
-      return;
-    }
-
-    setDisplayedText("");
-    setIsComplete(false);
-    
-    if (!text) return;
-
-    let index = 0;
-    const timer = setInterval(() => {
-      if (index < text.length) {
-        setDisplayedText(text.slice(0, index + 1));
-        index++;
-      } else {
-        setIsComplete(true);
-        clearInterval(timer);
-      }
-    }, speed);
-
-    return () => clearInterval(timer);
-  }, [text, speed, enabled]);
-
-  return { displayedText, isComplete };
-};
-
 interface ReasoningSectionProps {
   content: string;
   isStreaming?: boolean;
 }
 
+/**
+ * ReasoningSection 组件
+ * 
+ * 流式时在摘要末尾显示闪烁光标，表示正在思考
+ * 展开后直接显示累积的思考内容 + 光标
+ */
 const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
   const streaming = Boolean(isStreaming);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const summary = content.slice(0, 60) + (content.length > 60 ? '...' : '');
+  // 流式时显示动态摘要（内容末尾带光标提示）
+  const maxSummaryLen = 60;
+  const summary = content.length > maxSummaryLen 
+    ? content.slice(0, maxSummaryLen) + '...'
+    : content;
 
   return (
     <div className="space-y-1">
-      {/* 流式排版：一行简单文本摘要 */}
+      {/* 思考区头部：点击展开/收起 */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center gap-1.5 w-full text-left hover:opacity-80 transition-opacity"
@@ -68,6 +44,10 @@ const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
         <Brain className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
         <span className="text-xs text-slate-400 flex-1 truncate">
           {summary}
+          {/* 流式时在摘要末尾显示光标 */}
+          {streaming && !isExpanded && (
+            <span className="inline-block w-0.5 h-3 bg-slate-400 ml-0.5 animate-pulse align-middle" />
+          )}
         </span>
         <ChevronRight 
           className={cn(
@@ -77,10 +57,11 @@ const ReasoningSection = ({ content, isStreaming }: ReasoningSectionProps) => {
         />
       </button>
 
-      {/* 展开后的纯文本流 */}
+      {/* 展开后的完整思考内容 */}
       {isExpanded && (
         <div className="pl-5 ml-1.5 border-l border-slate-200 text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
           {content}
+          {/* 流式时在内容末尾显示光标 */}
           {streaming && (
             <span className="inline-block w-0.5 h-3 bg-slate-400 ml-0.5 animate-pulse" />
           )}
@@ -149,21 +130,29 @@ const ToolsSection = ({ tools, isNew }: ToolsSectionProps) => {
 
 interface ConclusionSectionProps {
   content: string;
-  enableTypewriter?: boolean;
-  animate?: boolean;
+  isStreaming?: boolean;
 }
 
-const ConclusionSection = ({ content, enableTypewriter, animate }: ConclusionSectionProps) => {
-  const shouldType = Boolean(enableTypewriter);
-  const shouldAnimate = Boolean(animate);
-  const { displayedText, isComplete } = useTypewriter(content, 15, shouldType);
+/**
+ * ConclusionSection 组件
+ * 
+ * 流式时直接显示累积的 content + 闪烁光标
+ * 这样就能实现类似 ChatGPT 的"打字机"效果，因为：
+ * 1. 后端 SSE 逐步返回 chunk
+ * 2. processChunk 累积内容到 conclusionContent
+ * 3. 每次更新都触发渲染，显示更多内容
+ * 4. 末尾光标指示正在输入
+ */
+const ConclusionSection = ({ content, isStreaming }: ConclusionSectionProps) => {
+  const streaming = Boolean(isStreaming);
 
   return (
-    <div className={cn("space-y-2", shouldAnimate && "animate-fade-in")}>
-      {/* Markdown 原生呈现 */}
+    <div className="space-y-2">
+      {/* Markdown 原生呈现 - 流式时直接显示累积的内容 */}
       <div className="text-sm">
-        <MarkdownRenderer content={displayedText} />
-        {!isComplete && shouldType && (
+        <MarkdownRenderer content={content} />
+        {/* 流式光标：在内容末尾显示闪烁光标 */}
+        {streaming && (
           <span className="inline-block w-0.5 h-4 bg-slate-400 ml-0.5 animate-pulse" />
         )}
       </div>
@@ -303,18 +292,12 @@ const StructuredMessage = ({
             />
           )}
           
-          {/* 正文区 */}
+          {/* 正文区 - 流式时直接显示累积内容 + 光标 */}
           {showConclusion && (
             <ConclusionSection 
               content={conclusion!} 
-              animate={isConclusionStreaming} 
-              enableTypewriter={false} 
+              isStreaming={isConclusionStreaming} 
             />
-          )}
-          
-          {/* 正文区流式光标（conclusion 正在输入时显示） */}
-          {isConclusionStreaming && (
-            <span className="inline-block w-0.5 h-4 bg-slate-400 ml-0.5 animate-pulse" />
           )}
         </div>
       )}
