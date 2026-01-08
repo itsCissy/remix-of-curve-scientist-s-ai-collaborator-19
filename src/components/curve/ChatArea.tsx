@@ -11,16 +11,25 @@ import CreateBranchDialog from "./CreateBranchDialog";
 import MergeBranchDialog from "./MergeBranchDialog";
 import SaveSkillDialog from "./SaveSkillDialog";
 import FileCenter from "./FileCenter";
-import { Message as LocalMessage, parseMessageContent, generateId, ParsedContent } from "@/lib/messageUtils";
+import { 
+  Message as LocalMessage, 
+  parseMessageContent, 
+  generateId, 
+  ParsedContent,
+  StreamingState,
+  createStreamingState,
+  processChunk,
+  finalizeStreamingState,
+  setStreamingError,
+} from "@/lib/messageUtils";
 import { cn } from "@/lib/utils";
 import { Agent, DEFAULT_AGENT, AVAILABLE_AGENTS } from "@/lib/agents";
 import { useToast } from "@/hooks/use-toast";
 import { useMessages } from "@/hooks/useProjects";
 import { useBranches, useCollaborator } from "@/hooks/useBranches";
 import { useFileAssets, extractFilesFromContent, detectCategory } from "@/hooks/useFileAssets";
-import { supabase, isLocalMode } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useSmartFolder } from "@/hooks/useSmartFolder";
-import { streamChat } from "@/lib/localAI";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
@@ -30,7 +39,6 @@ interface ChatAreaProps {
 }
 
 const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
-  console.log("[ChatArea] render", { projectId, projectName });
   const navigate = useNavigate();
   const { 
     setBreadcrumbItems, 
@@ -86,24 +94,6 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
   // AbortController for canceling streaming responses
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentProjectIdRef = useRef<string | null>(null);
-  const streamingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      // Clean up streaming timeout
-      if (streamingTimeoutRef.current) {
-        clearTimeout(streamingTimeoutRef.current);
-        streamingTimeoutRef.current = null;
-      }
-      
-      // Abort any ongoing requests
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-    };
-  }, []);
 
   // Handle skill injection from NavigationContext
   useEffect(() => {
@@ -326,13 +316,6 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
-      
-      // 2. Clear streaming timeout
-      if (streamingTimeoutRef.current) {
-        clearTimeout(streamingTimeoutRef.current);
-        streamingTimeoutRef.current = null;
-      }
-      
       setIsLoading(false);
       
       // 2. Reset UI state
@@ -452,9 +435,6 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
       return;
     }
 
-    // 标记当前项目，避免 streaming 校验时因未初始化导致丢包
-    currentProjectIdRef.current = projectId;
-
     // Ensure we have a branch
     let branchId = currentBranch?.id;
     if (!branchId) {
@@ -488,41 +468,7 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
 
     // Add to local state immediately for UX
     setLocalMessages((prev) => [...prev, userMessage]);
-    // 立即进入 loading / thinking 状态，避免等待网络请求时无动效
-    setIsLoading(true);
     
-    // Create new AbortController for this request
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-    
-    // Store current projectId to validate responses
-    const requestProjectId = projectId;
-
-    // Immediately create an empty assistant message to show "Thinking..."
-    const assistantMessageId = generateId();
-    setLocalMessages((prev) => [
-      ...prev,
-      {
-        id: assistantMessageId,
-        role: "assistant" as const,
-        content: "",
-        timestamp: new Date(),
-        isStreaming: true,
-      },
-    ]);
-
-    // 设置超时保护：60秒后自动清理 streaming 状态
-    streamingTimeoutRef.current = setTimeout(() => {
-      console.warn("Streaming timeout - cleaning up");
-      setLocalMessages((prev) => prev.filter(m => !m.isStreaming));
-      setIsLoading(false);
-      toast({
-        title: "请求超时",
-        description: "AI 响应超时，请重新发送消息",
-        variant: "destructive",
-      });
-    }, 60000);
-
     // Save to database with branch and collaborator info
     await supabase.from("messages").insert({
       project_id: projectId,
@@ -534,8 +480,22 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
       collaborator_id: collaborator?.id,
     });
 
+    setIsLoading(true);
+
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
+    // Store current projectId to validate responses
+    const requestProjectId = projectId;
+
+    // 用于累积原始内容（落库用）
     let assistantContent = "";
     
+    /**
+     * 流式更新 assistant 消息
+     * 使用状态机追踪当前阶段，实时路由内容到对应 UI 区域
+     */
     const upsertAssistant = (nextChunk: string) => {
       // Validate projectId hasn't changed during streaming
       if (currentProjectIdRef.current !== requestProjectId) {
@@ -543,7 +503,9 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
         return;
       }
       
+      // 累积原始内容（用于最终落库）
       assistantContent += nextChunk;
+      
       setLocalMessages((prev) => {
         // Double-check projectId before updating
         if (currentProjectIdRef.current !== requestProjectId) {
@@ -551,163 +513,172 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
         }
         
         const last = prev[prev.length - 1];
+        
         if (last?.role === "assistant" && last.isStreaming) {
+          // 更新现有流式消息
+          const currentStreamState = last.streamingState ?? createStreamingState();
+          const newStreamState = processChunk(currentStreamState, nextChunk);
+          
           return prev.map((m, i) =>
             i === prev.length - 1
-              ? { ...m, content: assistantContent, isStreaming: true }
+              ? { 
+                  ...m, 
+                  content: assistantContent, // 保持原始内容累积（用于落库）
+                  streamingState: newStreamState,
+                  isStreaming: true,
+                }
               : m
           );
         }
-        return prev;
+        
+        // 创建新流式消息
+        const initialState = processChunk(createStreamingState(), nextChunk);
+        
+        return [
+          ...prev,
+          {
+            id: generateId(),
+            role: "assistant" as const,
+            content: assistantContent,
+            timestamp: new Date(),
+            isStreaming: true,
+            streamingState: initialState,
+          },
+        ];
       });
     };
 
     try {
       const messagesToSend = [...localMessages, userMessage].map((m) => ({
-        role: m.role as 'user' | 'assistant' | 'system',
+        role: m.role,
         content: m.content,
       }));
 
-      // 本地模式：使用 streamChat（直接调用 OpenAI API 或模拟响应）
-      if (isLocalMode()) {
-        await new Promise<void>((resolve, reject) => {
-          streamChat({
-            messages: messagesToSend,
-            agentId: selectedAgent.id,
-            onChunk: (chunk) => {
-              if (currentProjectIdRef.current !== requestProjectId) return;
-              upsertAssistant(chunk);
-            },
-            onDone: () => {
-              if (currentProjectIdRef.current !== requestProjectId) {
-                console.warn("Project changed before saving message, aborting");
-                return;
-              }
-              resolve();
-            },
-            onError: (error) => {
-              reject(error);
-            },
-            signal: abortController.signal,
+      const resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ 
+          messages: messagesToSend,
+          agentId: selectedAgent.id,
+        }),
+        signal: abortController.signal,
+      });
+
+      if (!resp.ok) {
+        // Check if request was aborted
+        if (abortController.signal.aborted || currentProjectIdRef.current !== requestProjectId) {
+          return;
+        }
+        
+        const errorData = await resp.json().catch(() => ({}));
+        if (resp.status === 429) {
+          toast({
+            title: "请求过于频繁",
+            description: errorData.error || "请稍后再试",
+            variant: "destructive",
           });
-        });
-      } else {
-        // 远程模式：调用 Supabase Edge Function
-        const resp = await fetch(CHAT_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ 
-            messages: messagesToSend,
-            agentId: selectedAgent.id,
-          }),
-          signal: abortController.signal,
-        });
-
-        if (!resp.ok) {
-          // Check if request was aborted
-          if (abortController.signal.aborted || currentProjectIdRef.current !== requestProjectId) {
-            return;
-          }
-          
-          const errorData = await resp.json().catch(() => ({}));
-          if (resp.status === 429) {
-            toast({
-              title: "请求过于频繁",
-              description: errorData.error || "请稍后再试",
-              variant: "destructive",
-            });
-          } else if (resp.status === 402) {
-            toast({
-              title: "额度不足",
-              description: errorData.error || "请充值后再试",
-              variant: "destructive",
-            });
-          } else {
-            toast({
-              title: "发送失败",
-              description: errorData.error || "请稍后重试",
-              variant: "destructive",
-            });
-          }
-          
-          // 重置 streaming 状态 - 移除未完成的消息，避免僵尸消息
-          setLocalMessages((prev) => prev.filter(m => !m.isStreaming));
-          setIsLoading(false);
-          return;
+        } else if (resp.status === 402) {
+          toast({
+            title: "额度不足",
+            description: errorData.error || "请充值后再试",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "发送失败",
+            description: errorData.error || "请稍后重试",
+            variant: "destructive",
+          });
         }
+        setIsLoading(false);
+        return;
+      }
 
-        if (!resp.body) {
-          throw new Error("No response body");
-        }
+      if (!resp.body) {
+        throw new Error("No response body");
+      }
 
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let textBuffer = "";
-        let streamDone = false;
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = "";
+      let streamDone = false;
 
-        while (!streamDone) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          textBuffer += decoder.decode(value, { stream: true });
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
 
-          let newlineIndex: number;
-          while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-            let line = textBuffer.slice(0, newlineIndex);
-            textBuffer = textBuffer.slice(newlineIndex + 1);
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
 
-            if (line.endsWith("\r")) line = line.slice(0, -1);
-            if (line.startsWith(":") || !line || !line.trim()) continue;
-            if (!line.startsWith("data: ")) continue;
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || !line || !line.trim()) continue;
+          if (!line.startsWith("data: ")) continue;
 
-            const jsonStr = line.slice(6)?.trim() || "";
-            if (jsonStr === "[DONE]") {
-              streamDone = true;
-              break;
-            }
-
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-              if (content) upsertAssistant(content);
-            } catch {
-              textBuffer = line + "\n" + textBuffer;
-              break;
-            }
+          const jsonStr = line.slice(6)?.trim() || "";
+          if (jsonStr === "[DONE]") {
+            streamDone = true;
+            break;
           }
-        }
 
-        // Final flush
-        if (textBuffer?.trim()) {
-          for (let raw of textBuffer.split("\n")) {
-            if (!raw) continue;
-            if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-            if (raw.startsWith(":") || !raw || !raw.trim()) continue;
-            if (!raw.startsWith("data: ")) continue;
-            const jsonStr = raw.slice(6)?.trim() || "";
-            if (jsonStr === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-              if (content) upsertAssistant(content);
-            } catch {
-              /* ignore */
-            }
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) upsertAssistant(content);
+          } catch {
+            textBuffer = line + "\n" + textBuffer;
+            break;
           }
-        }
-
-        // Validate projectId before saving
-        if (currentProjectIdRef.current !== requestProjectId) {
-          console.warn("Project changed before saving message, aborting");
-          return;
         }
       }
 
-      // Mark streaming as done and save to database
+      // Final flush
+      if (textBuffer?.trim()) {
+        for (let raw of textBuffer.split("\n")) {
+          if (!raw) continue;
+          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
+          if (raw.startsWith(":") || !raw || !raw.trim()) continue;
+          if (!raw.startsWith("data: ")) continue;
+          const jsonStr = raw.slice(6)?.trim() || "";
+          if (jsonStr === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) upsertAssistant(content);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      // Validate projectId before saving
+      if (currentProjectIdRef.current !== requestProjectId) {
+        console.warn("Project changed before saving message, aborting");
+        return;
+      }
+
+      // 流式结束：finalize 状态机，清除 streamingState，标记完成
       setLocalMessages((prev) =>
-        prev.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
+        prev.map((m) => {
+          if (!m.isStreaming) return m;
+          
+          // 处理 buffer 残留并标记完成
+          const finalState = m.streamingState 
+            ? finalizeStreamingState(m.streamingState)
+            : undefined;
+          
+          // 清除 streamingState，后续渲染使用 parseMessageContent
+          return { 
+            ...m, 
+            isStreaming: false,
+            streamingState: undefined,
+          };
+        })
       );
 
       // Save assistant message to database with branch info
@@ -747,59 +718,43 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { name?: string; message?: string };
+      
       // Ignore abort errors
-      if (error?.name === 'AbortError' || abortController.signal.aborted) {
+      if (err?.name === 'AbortError' || abortController.signal.aborted) {
         console.log("Request aborted due to project change");
-        // 即使是 abort，也要清理 streaming 消息
-        setLocalMessages((prev) => prev.filter(m => !m.isStreaming));
         return;
       }
       
       // Ignore errors if projectId changed
       if (currentProjectIdRef.current !== requestProjectId) {
-        // 清理 streaming 消息
-        setLocalMessages((prev) => prev.filter(m => !m.isStreaming));
         return;
       }
       
       console.error("Chat error:", error);
       
-      // 移除未完成的 streaming 消息，避免僵尸消息
-      setLocalMessages((prev) => prev.filter(m => !m.isStreaming));
-      
-      // 区分不同类型的错误
-      let errorTitle = "发送失败";
-      let errorDescription = "未知错误";
-      
-      if (error?.name === 'TypeError' && error?.message?.includes('fetch')) {
-        // 真正的网络错误（无法连接）
-        errorTitle = "网络错误";
-        errorDescription = "无法连接到服务器，请检查网络连接";
-      } else if (error?.message?.includes('timeout')) {
-        // 超时错误
-        errorTitle = "请求超时";
-        errorDescription = "服务器响应超时，请稍后重试";
-      } else if (error?.message) {
-        // 其他错误，显示具体信息
-        errorDescription = error.message;
-      } else {
-        // 兜底错误
-        errorDescription = "请稍后重试";
-      }
+      // 设置流式消息为错误状态
+      setLocalMessages((prev) =>
+        prev.map((m) =>
+          m.isStreaming
+            ? {
+                ...m,
+                isStreaming: false,
+                streamingState: m.streamingState
+                  ? setStreamingError(m.streamingState, err?.message || '网络错误')
+                  : undefined,
+              }
+            : m
+        )
+      );
       
       toast({
-        title: errorTitle,
-        description: errorDescription,
+        title: "发送失败",
+        description: "网络错误，请检查连接后重试",
         variant: "destructive",
       });
     } finally {
-      // 清除超时定时器
-      if (streamingTimeoutRef.current) {
-        clearTimeout(streamingTimeoutRef.current);
-        streamingTimeoutRef.current = null;
-      }
-      
       // Only update loading state if still on same project
       if (currentProjectIdRef.current === requestProjectId) {
         setIsLoading(false);
@@ -914,9 +869,6 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
           description: errorData.error || "请稍后重试",
           variant: "destructive",
         });
-        
-        // 重置 streaming 状态 - 移除未完成的消息
-        setLocalMessages((prev) => prev.filter(m => !m.isStreaming));
         setIsLoading(false);
         return;
       }
@@ -1022,28 +974,11 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
           }
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Edit resend error:", error);
-      
-      // 移除未完成的 streaming 消息
-      setLocalMessages((prev) => prev.filter(m => !m.isStreaming));
-      
-      // 区分不同类型的错误
-      let errorDescription = "未知错误";
-      
-      if (error?.name === 'TypeError' && error?.message?.includes('fetch')) {
-        errorDescription = "无法连接到服务器，请检查网络连接";
-      } else if (error?.message?.includes('timeout')) {
-        errorDescription = "服务器响应超时，请稍后重试";
-      } else if (error?.message) {
-        errorDescription = error.message;
-      } else {
-        errorDescription = "请稍后重试";
-      }
-      
       toast({
         title: "重新发送失败",
-        description: errorDescription,
+        description: "网络错误，请检查连接后重试",
         variant: "destructive",
       });
     } finally {
@@ -1248,8 +1183,8 @@ const ChatArea = ({ projectId, projectName }: ChatAreaProps) => {
                   <AgentMessage
                     key={message.id}
                     content={message.content}
-                    parsedContent={parseMessageContent(message.content)}
                     isStreaming={message.isStreaming}
+                    streamingState={message.streamingState}
                     files={message.files}
                     messageId={message.id}
                     onCreateBranch={handleCreateBranch}
